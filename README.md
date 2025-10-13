@@ -20,12 +20,12 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 ```json
 {
   "dependencies": {
-    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#v1.0.0"
+    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.0"
   }
 }
 ```
 
-Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
+Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.0` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
 
 로컬 패키지로 쓰고 싶다면 이 저장소를 클론한 뒤 `Packages/com.muabe.webview` 경로를 선택해 `Add package from disk...`를 실행하면 됩니다.
 

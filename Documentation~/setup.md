@@ -11,15 +11,15 @@
 ## 설치 방법
 
 ### GitHub 패키지 의존성 추가
-1. 프로젝트의 `Packages/manifest.json` 파일에 다음 의존성을 추가합니다.
+1. 프로젝트의 `Packages/manifest.json` 파일에 다음 의존성을 추가합니다. (현재 배포 태그는 `Release-1.0.0`입니다.)
    ```json
    {
      "dependencies": {
-       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#v1.0.0"
+       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.0"
      }
    }
    ```
-2. Unity를 다시 열거나 `Window > Package Manager`에서 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력합니다.
+2. Unity를 다시 열거나 `Window > Package Manager`에서 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력합니다. 태그 이름이 정확히 `Release-1.0.0`인지 확인하세요.
 3. Package Manager 목록에 **Muabe Interactive WebView**가 표시되면 설치가 완료된 것입니다.
 
 ### 로컬 패키지로 추가
