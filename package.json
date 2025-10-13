@@ -1,0 +1,12 @@
+{
+  "name": "com.muabe.webview",
+  "version": "1.0.0",
+  "displayName": "Muabe Interactive WebView",
+  "description": "Embeds a webview with an optional local web server and remote content installer for Android, iOS, and WebGL.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Muabemotion",
+    "email": "dev@muabe.com",
+    "url": "https://www.muabe.com/"
+  }
+}
