@@ -8,8 +8,9 @@ public class WebViewController : MonoBehaviour
     [Tooltip("로컬 서버 포트")]
     public int serverPort = 8088;
 
-    [Tooltip("플러터 웹이 서비스되는 경로(예: /flutter/)")]
-    public string webRootPath = "/flutter/";
+    [Tooltip("플러터 웹이 서비스되는 경로(예: /flutter/)"), HideInInspector]
+    [SerializeField]
+    private string webRootPath = "/flutter/";
 
     [Header("WebView")]
     [Tooltip("초기 URL 자동 로드 여부")]
@@ -122,6 +123,29 @@ public class WebViewController : MonoBehaviour
         webViewObject.LoadURL(initialUrl);
     }
 
+    public void SetWebRootPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            webRootPath = "/";
+        }
+        else
+        {
+            string normalized = path.Trim();
+            if (!normalized.StartsWith("/"))
+            {
+                normalized = "/" + normalized;
+            }
+            if (!normalized.EndsWith("/"))
+            {
+                normalized += "/";
+            }
+            webRootPath = normalized;
+        }
+
+        initialUrl = BuildInitialUrl();
+    }
+
     private string BuildInitialUrl()
     {
         string root = string.IsNullOrEmpty(webRootPath) ? "/" : webRootPath;
@@ -160,6 +184,8 @@ public class WebViewController : MonoBehaviour
         applyingMargins = false;
     }
 
+    public string WebRootPath => webRootPath;
+
     private IEnumerator ApplyMarginsNextFrame()
     {
         yield return null;
@@ -187,6 +213,18 @@ public class WebViewController : MonoBehaviour
         lastOrientation = Screen.orientation;
 
         Debug.Log($"{LogPrefix} Margins L:{left} T:{top} R:{right} B:{bottom} | res:{Screen.width}x{Screen.height} | safe:{safeArea} | orient:{lastOrientation}");
+    }
+
+    public void SetWebViewInteractionEnabled(bool enabled)
+    {
+        if (webViewObject == null)
+        {
+            Debug.LogWarning($"{LogPrefix} SetWebViewInteractionEnabled called before WebView is ready.");
+            return;
+        }
+
+        webViewObject.SetInteractionEnabled(enabled);
+        Debug.Log($"{LogPrefix} WebView interaction {(enabled ? "enabled" : "disabled")}.");
     }
 
     private void OnDestroy()

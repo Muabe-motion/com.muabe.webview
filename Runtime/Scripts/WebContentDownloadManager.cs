@@ -6,25 +6,23 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
 
-public class RemoteWebContentInstaller : MonoBehaviour
+public class WebContentDownloadManager : MonoBehaviour
 {
-    private const string LogPrefix = "[RemoteWebContentInstaller]";
+    private const string LogPrefix = "[WebContentDownloadManager]";
     [Header("다운로드 설정")]
-    [SerializeField]
-    [Tooltip("원격에서 받을 ZIP 파일 URL")]
-    private string downloadUrl = "https://pub-8573e57a18ed403493bfc401bcca451b.r2.dev/flutter.zip";
+    [SerializeField, HideInInspector]
+    [Tooltip("원격에서 받을 ZIP 파일 URL (선택). 비워두면 DownloadContent 호출 시 전달된 URL을 사용합니다.")]
+    private string defaultDownloadUrl = string.Empty;
 
     [SerializeField]
     [Tooltip("다운로드한 콘텐츠를 저장할 하위 폴더 이름 (persistentDataPath 기준)")]
     private string installFolderName = "webview-content";
 
-    [SerializeField]
-    [Tooltip("ZIP 내부에서 웹 앱이 들어 있는 하위 폴더 (예: 'flutter'). 빈 값이면 ZIP 최상위가 곧 콘텐츠 루트")]
-    private string contentRootSubfolder = "flutter";
+    [SerializeField, HideInInspector]
+    private string contentRootSubfolder = "root";
 
-    [SerializeField]
-    [Tooltip("콘텐츠 버전. 버전이 다르면 다시 다운로드합니다.")]
-    private string remoteVersion = "1.0.0";
+    [SerializeField, HideInInspector]
+    private string remoteVersion = string.Empty;
 
     [SerializeField]
     [Tooltip("버전 정보를 저장할 파일 이름")]
@@ -39,21 +37,6 @@ public class RemoteWebContentInstaller : MonoBehaviour
     private bool clearFolderBeforeInstall = true;
 
     [SerializeField]
-    [Tooltip("설치가 끝나면 LocalWebServer에 콘텐츠 경로를 지정하고 서버를 자동으로 시작합니다.")]
-    private bool autoStartServer = true;
-
-    [SerializeField]
-    [Tooltip("콘텐츠를 제공할 LocalWebServer")]
-    private LocalWebServer targetServer;
-
-    [SerializeField]
-    [Tooltip("설치가 끝난 뒤 자동으로 URL을 로드할 WebViewController")]
-    private WebViewController targetWebView;
-
-    [SerializeField]
-    [Tooltip("설치 완료 시 targetWebView.LoadInitialUrl()을 자동으로 호출합니다.")]
-    private bool autoLoadWebViewOnInstall = true;
-
     [Header("이벤트")]
     public UnityEvent onInstallStarted;
     public UnityEvent onInstallCompleted;
@@ -61,44 +44,36 @@ public class RemoteWebContentInstaller : MonoBehaviour
 
     private Coroutine installRoutine;
     private bool forceInstallRequested;
+    private string activeDownloadUrl;
+    private string lastDownloadUrl;
 
     public string InstallPath => Path.Combine(Application.persistentDataPath, installFolderName);
+    public string ContentRootPath
+    {
+        get
+        {
+            string path = InstallPath;
+            if (!string.IsNullOrEmpty(contentRootSubfolder))
+            {
+                path = Path.Combine(path, NormalizeSubfolder(contentRootSubfolder));
+            }
+            return path;
+        }
+    }
+
+    public string LastInstallPath { get; private set; }
 
     private void Awake()
     {
-        AutoAssignComponents();
-        Debug.Log($"{LogPrefix} Awake (installOnStart={installOnStart}, autoStartServer={autoStartServer}, autoLoadWebViewOnInstall={autoLoadWebViewOnInstall})");
-    }
-
-    private void Reset()
-    {
-        AutoAssignComponents();
-    }
-
-    private void OnValidate()
-    {
-        AutoAssignComponents();
-    }
-
-    private void AutoAssignComponents()
-    {
-        if (targetServer == null)
-        {
-            targetServer = GetComponent<LocalWebServer>();
-        }
-
-        if (targetWebView == null)
-        {
-            targetWebView = GetComponent<WebViewController>();
-            if (targetWebView == null)
-            {
-                targetWebView = GetComponentInChildren<WebViewController>(true);
-            }
-        }
+        contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+        remoteVersion = NormalizeVersion(remoteVersion);
+        Debug.Log($"{LogPrefix} Awake (installOnStart={installOnStart})");
     }
 
     private void Start()
     {
+        contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+        remoteVersion = NormalizeVersion(remoteVersion);
         Debug.Log($"{LogPrefix} Start (installOnStart={installOnStart})");
         if (installOnStart)
         {
@@ -106,12 +81,48 @@ public class RemoteWebContentInstaller : MonoBehaviour
         }
     }
 
-    public void BeginInstallIfNeeded()
+    private void OnValidate()
+    {
+        contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+        remoteVersion = NormalizeVersion(remoteVersion);
+    }
+
+    public void DownloadContent()
     {
         BeginInstall(false);
     }
 
-    public void BeginInstall(bool forceRedownload = false)
+    public void DownloadContentForced()
+    {
+        BeginInstall(true);
+    }
+
+    public void DownloadContent(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            Debug.LogWarning($"{LogPrefix} DownloadContent(string) called with empty URL.");
+            return;
+        }
+        BeginInstall(false, url);
+    }
+
+    public void DownloadContentForced(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            Debug.LogWarning($"{LogPrefix} DownloadContentForced(string) called with empty URL.");
+            return;
+        }
+        BeginInstall(true, url);
+    }
+
+    public void BeginInstallIfNeeded(string overrideDownloadUrl = null)
+    {
+        BeginInstall(false, overrideDownloadUrl);
+    }
+
+    public void BeginInstall(bool forceRedownload = false, string overrideDownloadUrl = null)
     {
         if (installRoutine != null)
         {
@@ -120,6 +131,23 @@ public class RemoteWebContentInstaller : MonoBehaviour
         }
 
         forceInstallRequested = forceRedownload;
+        if (!string.IsNullOrWhiteSpace(overrideDownloadUrl))
+        {
+            activeDownloadUrl = overrideDownloadUrl.Trim();
+            lastDownloadUrl = activeDownloadUrl;
+        }
+        else if (!string.IsNullOrWhiteSpace(lastDownloadUrl))
+        {
+            activeDownloadUrl = lastDownloadUrl;
+        }
+        else
+        {
+            activeDownloadUrl = defaultDownloadUrl;
+            if (!string.IsNullOrWhiteSpace(activeDownloadUrl))
+            {
+                lastDownloadUrl = activeDownloadUrl;
+            }
+        }
         Debug.Log($"{LogPrefix} BeginInstall(force={forceRedownload})");
         installRoutine = StartCoroutine(EnsureContentRoutine());
     }
@@ -138,6 +166,13 @@ public class RemoteWebContentInstaller : MonoBehaviour
             }
 
             string existingVersion = File.ReadAllText(versionFilePath).Trim();
+            if (string.IsNullOrEmpty(remoteVersion))
+            {
+                remoteVersion = NormalizeVersion(existingVersion);
+                Debug.Log($"{LogPrefix} HasInstalledContent? pathExists={pathExists} version={existingVersion} matches=True (remoteVersion empty, adopting existing)");
+                return true;
+            }
+
             bool matches = existingVersion == remoteVersion;
             Debug.Log($"{LogPrefix} HasInstalledContent? pathExists={pathExists} version={existingVersion} matches={matches}");
             return matches;
@@ -149,15 +184,26 @@ public class RemoteWebContentInstaller : MonoBehaviour
         }
     }
 
+    public bool TryGetInstalledContentRoot(out string contentRoot)
+    {
+        contentRoot = ContentRootPath;
+        return Directory.Exists(contentRoot);
+    }
+
+    public string RemoteVersion => remoteVersion;
+
+    public void SetRemoteVersion(string version)
+    {
+        remoteVersion = NormalizeVersion(version);
+    }
+
+    public void SetContentRootSubfolder(string subfolder)
+    {
+        contentRootSubfolder = NormalizeSubfolder(subfolder);
+    }
+
     private IEnumerator EnsureContentRoutine()
     {
-        if (string.IsNullOrWhiteSpace(downloadUrl))
-        {
-            Debug.LogWarning($"{LogPrefix} Download URL is empty. Skipping installation.");
-            installRoutine = null;
-            yield break;
-        }
-
         string installPath = InstallPath;
         string versionFilePath = Path.Combine(installPath, versionFileName);
 
@@ -184,16 +230,27 @@ public class RemoteWebContentInstaller : MonoBehaviour
 
         if (!needsDownload)
         {
-            HandlePostInstall(installPath);
+            LastInstallPath = installPath;
             onInstallCompleted?.Invoke();
             installRoutine = null;
+            activeDownloadUrl = null;
+            yield break;
+        }
+
+        string resolvedUrl = activeDownloadUrl;
+        if (string.IsNullOrWhiteSpace(resolvedUrl))
+        {
+            Debug.LogWarning($"{LogPrefix} Download URL is empty. Skipping installation.");
+            onInstallFailed?.Invoke();
+            installRoutine = null;
+            activeDownloadUrl = null;
             yield break;
         }
 
         onInstallStarted?.Invoke();
-        Debug.Log($"{LogPrefix} Downloading from {downloadUrl}");
+        Debug.Log($"{LogPrefix} Downloading from {resolvedUrl}");
 
-        using UnityWebRequest request = UnityWebRequest.Get(downloadUrl);
+        using UnityWebRequest request = UnityWebRequest.Get(resolvedUrl);
         yield return request.SendWebRequest();
 
         if (request.result != UnityWebRequest.Result.Success)
@@ -201,6 +258,7 @@ public class RemoteWebContentInstaller : MonoBehaviour
             Debug.LogError($"{LogPrefix} Download failed: {request.error}");
             onInstallFailed?.Invoke();
             installRoutine = null;
+            activeDownloadUrl = null;
             yield break;
         }
 
@@ -210,6 +268,7 @@ public class RemoteWebContentInstaller : MonoBehaviour
             Debug.LogError($"{LogPrefix} Download returned empty data.");
             onInstallFailed?.Invoke();
             installRoutine = null;
+            activeDownloadUrl = null;
             yield break;
         }
 
@@ -224,12 +283,31 @@ public class RemoteWebContentInstaller : MonoBehaviour
             Debug.LogError($"{LogPrefix} Failed to install content: {e}");
             onInstallFailed?.Invoke();
             installRoutine = null;
+            activeDownloadUrl = null;
             yield break;
         }
 
-        HandlePostInstall(installPath);
+        LastInstallPath = installPath;
         onInstallCompleted?.Invoke();
         installRoutine = null;
+        activeDownloadUrl = null;
+    }
+
+    private string NormalizeVersion(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private string NormalizeSubfolder(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string normalized = value.Trim().Replace('\\', '/');
+        normalized = normalized.Trim('/');
+        return normalized;
     }
 
     private void InstallFromZip(byte[] zipData, string installPath)
@@ -275,75 +353,4 @@ public class RemoteWebContentInstaller : MonoBehaviour
         Debug.Log($"{LogPrefix} Extracted {archive.Entries.Count} entries.");
     }
 
-    private void HandlePostInstall(string installPath)
-    {
-        if (targetServer != null)
-        {
-            ApplyToServer(installPath);
-        }
-        else if (autoStartServer)
-        {
-            Debug.LogWarning($"{LogPrefix} targetServer is not assigned. Server will not start automatically.");
-        }
-
-        if (autoLoadWebViewOnInstall && targetWebView != null)
-        {
-            targetWebView.StartCoroutine(LoadWebViewAfterServer());
-        }
-        else if (autoLoadWebViewOnInstall && targetWebView == null)
-        {
-            Debug.LogWarning($"{LogPrefix} targetWebView is not assigned. WebView will not auto-load.");
-        }
-    }
-
-    private void ApplyToServer(string installPath)
-    {
-        if (targetServer == null)
-        {
-            return;
-        }
-
-        string contentRoot = installPath;
-        if (!string.IsNullOrEmpty(contentRootSubfolder))
-        {
-            contentRoot = Path.Combine(contentRoot, contentRootSubfolder);
-        }
-
-        targetServer.SetContentRootOverride(contentRoot);
-        Debug.Log($"{LogPrefix} Applied content root {contentRoot}");
-        if (autoStartServer)
-        {
-            targetServer.StartServer();
-        }
-    }
-
-    private IEnumerator LoadWebViewAfterServer()
-    {
-        if (targetServer != null)
-        {
-            float timeout = 5f;
-            while (!targetServer.IsRunning && timeout > 0f)
-            {
-                yield return null;
-                timeout -= Time.unscaledDeltaTime;
-            }
-            if (!targetServer.IsRunning)
-            {
-                Debug.LogWarning($"{LogPrefix} Server did not start within timeout; loading WebView anyway");
-            }
-            else
-            {
-                Debug.Log($"{LogPrefix} Server is running; proceeding to load WebView");
-            }
-        }
-
-        yield return null;
-        targetWebView.LoadInitialUrl();
-        Debug.Log($"{LogPrefix} LoadInitialUrl invoked");
-    }
-
-    public void SetTargetWebView(WebViewController controller)
-    {
-        targetWebView = controller;
-    }
 }

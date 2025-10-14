@@ -48,10 +48,6 @@ public class LocalWebServer : MonoBehaviour
     private ContentRootSource contentSource = ContentRootSource.PersistentDataPath;
 
     [SerializeField]
-    [Tooltip("요청 URL에서 첫 번째 세그먼트이자 콘텐츠 폴더 이름 (예: 'flutter')")]
-    private string routePrefix = "flutter";
-
-    [SerializeField]
     [Tooltip("ContentRootSource가 CustomAbsolute일 때 사용할 절대 경로")]
     private string customAbsoluteContentRoot = string.Empty;
 
@@ -68,6 +64,7 @@ public class LocalWebServer : MonoBehaviour
     private bool isRunning;
     private string contentRootOverride;
     private string cachedContentRootFullPath;
+    private string routePrefix = string.Empty;
     public bool IsRunning => isRunning;
 
     private void Awake()
@@ -116,6 +113,12 @@ public class LocalWebServer : MonoBehaviour
         Debug.Log($"{LogPrefix} Content root override set to {cachedContentRootFullPath}");
     }
 
+    public void SetRoutePrefix(string prefix)
+    {
+        routePrefix = NormalizeRoute(prefix);
+        cachedContentRootFullPath = string.Empty;
+    }
+
     public string GetCurrentContentRoot()
     {
         if (!string.IsNullOrEmpty(cachedContentRootFullPath))
@@ -144,11 +147,11 @@ public class LocalWebServer : MonoBehaviour
 
         if (contentSource != ContentRootSource.CustomAbsolute)
         {
-            string prefix = RoutePrefix;
-            if (!string.IsNullOrEmpty(prefix))
-            {
-                basePath = CombineFilesystemPath(basePath, prefix);
-            }
+        string prefix = NormalizeRoute(routePrefix);
+        if (!string.IsNullOrEmpty(prefix))
+        {
+            basePath = CombineFilesystemPath(basePath, prefix);
+        }
         }
 
         cachedContentRootFullPath = NormalizeFullPath(basePath);
@@ -279,7 +282,7 @@ public class LocalWebServer : MonoBehaviour
 
     private void ProcessGetRequest(NetworkStream stream, string url)
     {
-        string route = RoutePrefix;
+        string route = NormalizeRoute(routePrefix);
         string normalizedPath = NormalizeRequestPath(url);
 
         if (!TryGetRelativePath(normalizedPath, route, out string relativePath))
@@ -367,7 +370,7 @@ public class LocalWebServer : MonoBehaviour
 
     private IEnumerator PreloadStreamingAssets()
     {
-        string route = RoutePrefix;
+        string route = NormalizeRoute(routePrefix);
         string rootPath = GetCurrentContentRoot();
         if (string.IsNullOrEmpty(rootPath))
         {
@@ -628,7 +631,16 @@ public class LocalWebServer : MonoBehaviour
         return trimmed;
     }
 
-    private string RoutePrefix => string.IsNullOrEmpty(routePrefix) ? string.Empty : routePrefix.Trim('/');
+    private string NormalizeRoute(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim().Trim('/');
+    }
+
 
     private bool ShouldUseAndroidStreamingAssets()
     {
