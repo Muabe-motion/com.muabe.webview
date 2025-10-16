@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class WebViewController : MonoBehaviour
 {
@@ -26,6 +27,22 @@ public class WebViewController : MonoBehaviour
     private LocalWebServer localServer;
     private string initialUrl;
 
+    private bool isWebViewReady;
+    private readonly Queue<string> pendingJavaScript = new Queue<string>();
+
+    [Header("Overlay Margins (px)")]
+    [SerializeField]
+    private int overlayPaddingLeft;
+
+    [SerializeField]
+    private int overlayPaddingTop;
+
+    [SerializeField]
+    private int overlayPaddingRight;
+
+    [SerializeField]
+    private int overlayPaddingBottom;
+
     // 회전/해상도/세이프에어리어 변화 감지용 캐시
     private Rect lastSafeArea;
     private Vector2Int lastResolution;
@@ -50,6 +67,18 @@ public class WebViewController : MonoBehaviour
         StartCoroutine(InitializeWebView());
     }
 
+    private void OnValidate()
+    {
+        overlayPaddingLeft = Mathf.Max(0, overlayPaddingLeft);
+        overlayPaddingTop = Mathf.Max(0, overlayPaddingTop);
+        overlayPaddingRight = Mathf.Max(0, overlayPaddingRight);
+        overlayPaddingBottom = Mathf.Max(0, overlayPaddingBottom);
+        if (Application.isPlaying && webViewObject != null)
+        {
+            ApplySafeAreaMargins();
+        }
+    }
+
     private IEnumerator InitializeWebView()
     {
         yield return new WaitForSeconds(0.5f);
@@ -59,6 +88,7 @@ public class WebViewController : MonoBehaviour
 
         webViewObject = (new GameObject("WebViewObject")).AddComponent<WebViewObject>();
         Debug.Log($"{LogPrefix} WebViewObject created.");
+        isWebViewReady = false;
 
         webViewObject.Init(
             cb: (msg) =>
@@ -76,6 +106,7 @@ public class WebViewController : MonoBehaviour
             started: (msg) =>
             {
                 Debug.Log($"[WebView] Started: {msg}");
+                isWebViewReady = false;
             },
             hooked: (msg) =>
             {
@@ -86,6 +117,8 @@ public class WebViewController : MonoBehaviour
                 Debug.Log($"[WebView] Loaded: {msg}");
                 StartCoroutine(ApplyMarginsNextFrame());
                 webViewObject.SetVisibility(true);
+                isWebViewReady = true;
+                FlushPendingJavaScript();
             },
             enableWKWebView: enableWKWebView,
             transparent: transparent
@@ -121,6 +154,7 @@ public class WebViewController : MonoBehaviour
 
         Debug.Log($"{LogPrefix} Loading URL: {initialUrl}");
         webViewObject.LoadURL(initialUrl);
+        isWebViewReady = false;
     }
 
     public void SetWebRootPath(string path)
@@ -185,6 +219,8 @@ public class WebViewController : MonoBehaviour
     }
 
     public string WebRootPath => webRootPath;
+    public bool IsWebViewReady => isWebViewReady;
+    public int OverlayPaddingTop => overlayPaddingTop;
 
     private IEnumerator ApplyMarginsNextFrame()
     {
@@ -196,6 +232,10 @@ public class WebViewController : MonoBehaviour
     {
         if (webViewObject == null)
         {
+            if (Application.isPlaying)
+            {
+                Debug.Log($"{LogPrefix} ApplySafeAreaMargins skipped because WebView is not ready.");
+            }
             return;
         }
 
@@ -206,13 +246,42 @@ public class WebViewController : MonoBehaviour
         int top = Mathf.RoundToInt(Screen.height - safeArea.yMax);
         int bottom = Mathf.RoundToInt(safeArea.yMin);
 
+        left = Mathf.Max(0, left + overlayPaddingLeft);
+        right = Mathf.Max(0, right + overlayPaddingRight);
+        top = Mathf.Max(0, top + overlayPaddingTop);
+        bottom = Mathf.Max(0, bottom + overlayPaddingBottom);
+
         webViewObject.SetMargins(left, top, right, bottom);
 
         lastSafeArea = safeArea;
         lastResolution = new Vector2Int(Screen.width, Screen.height);
         lastOrientation = Screen.orientation;
 
-        Debug.Log($"{LogPrefix} Margins L:{left} T:{top} R:{right} B:{bottom} | res:{Screen.width}x{Screen.height} | safe:{safeArea} | orient:{lastOrientation}");
+        Debug.Log($"{LogPrefix} Margins L:{left} T:{top} R:{right} B:{bottom} | overlay:{overlayPaddingLeft}/{overlayPaddingTop}/{overlayPaddingRight}/{overlayPaddingBottom} | res:{Screen.width}x{Screen.height} | safe:{safeArea} | orient:{lastOrientation}");
+    }
+
+    public void RunJavaScript(string js, bool queueUntilReady = true)
+    {
+        if (string.IsNullOrWhiteSpace(js))
+        {
+            Debug.LogWarning($"{LogPrefix} RunJavaScript called with empty script.");
+            return;
+        }
+
+        if (queueUntilReady && (webViewObject == null || !isWebViewReady))
+        {
+            pendingJavaScript.Enqueue(js);
+            Debug.Log($"{LogPrefix} Queued JS until WebView is ready. Queue size: {pendingJavaScript.Count}");
+            return;
+        }
+
+        if (webViewObject == null)
+        {
+            Debug.LogWarning($"{LogPrefix} RunJavaScript called before WebView is created.");
+            return;
+        }
+
+        webViewObject.EvaluateJS(js);
     }
 
     public void SetWebViewInteractionEnabled(bool enabled)
@@ -234,6 +303,9 @@ public class WebViewController : MonoBehaviour
             Destroy(webViewObject.gameObject);
             webViewObject = null;
         }
+
+        pendingJavaScript.Clear();
+        isWebViewReady = false;
 
         if (localServer != null)
         {
@@ -258,5 +330,64 @@ public class WebViewController : MonoBehaviour
 
         Debug.Log($"{LogPrefix} SetVisible({visible})");
         webViewObject.SetVisibility(visible);
+    }
+
+    private void FlushPendingJavaScript()
+    {
+        if (webViewObject == null || pendingJavaScript.Count == 0)
+        {
+            return;
+        }
+
+        while (pendingJavaScript.Count > 0)
+        {
+            var js = pendingJavaScript.Dequeue();
+            webViewObject.EvaluateJS(js);
+        }
+    }
+
+    public void SetOverlayPadding(int left, int top, int right, int bottom)
+    {
+        overlayPaddingLeft = Mathf.Max(0, left);
+        overlayPaddingTop = Mathf.Max(0, top);
+        overlayPaddingRight = Mathf.Max(0, right);
+        overlayPaddingBottom = Mathf.Max(0, bottom);
+        ApplySafeAreaMargins();
+    }
+
+    public void SetOverlayPaddingTop(int top)
+    {
+        top = Mathf.Max(0, top);
+        if (overlayPaddingTop == top)
+        {
+            Debug.Log($"{LogPrefix} Overlay top unchanged ({overlayPaddingTop}).");
+            return;
+        }
+
+        overlayPaddingTop = top;
+        Debug.Log($"{LogPrefix} SetOverlayPaddingTop -> {overlayPaddingTop}");
+        ApplySafeAreaMargins();
+    }
+
+    public void EnsureOverlayPaddingTop(int top)
+    {
+        top = Mathf.Max(0, top);
+        if (top <= overlayPaddingTop)
+        {
+            Debug.Log($"{LogPrefix} EnsureOverlayPaddingTop ignored (current={overlayPaddingTop}, requested={top}).");
+            return;
+        }
+
+        overlayPaddingTop = top;
+        Debug.Log($"{LogPrefix} EnsureOverlayPaddingTop -> {overlayPaddingTop}");
+        ApplySafeAreaMargins();
+    }
+
+    public void GetOverlayPadding(out int left, out int top, out int right, out int bottom)
+    {
+        left = overlayPaddingLeft;
+        top = overlayPaddingTop;
+        right = overlayPaddingRight;
+        bottom = overlayPaddingBottom;
     }
 }
