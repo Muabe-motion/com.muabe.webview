@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[DisallowMultipleComponent]
-public class FlutterWebBridge : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[FlutterWebBridge]";
-    private const string DefaultEventName = "UnityToFlutter";
-    private const string CommandType = "setWidgetVisibility";
+    [DisallowMultipleComponent]
+    public class FlutterWebBridge : MonoBehaviour
+    {
+        private const string LogPrefix = WebViewConstants.LogPrefixFlutterBridge;
+        private const string DefaultEventName = WebViewConstants.DefaultFlutterEventName;
+        private const string CommandType = WebViewConstants.CommandTypeVisibility;
 
     [SerializeField]
     [Tooltip("명시하지 않으면 같은 게임오브젝트의 WebViewController를 자동으로 찾습니다.")]
@@ -27,10 +29,10 @@ public class FlutterWebBridge : MonoBehaviour
 
         unityToFlutterEventName = SanitizeEventName(unityToFlutterEventName);
 
-        if (webViewController == null)
-        {
-            Debug.LogError($"{LogPrefix} WebViewController reference could not be resolved. Bridge will not function.");
-        }
+            if (webViewController == null)
+            {
+                WebViewUtility.LogError(LogPrefix, "WebViewController reference could not be resolved. Bridge will not function.");
+            }
     }
 
     private void OnValidate()
@@ -110,21 +112,17 @@ public class FlutterWebBridge : MonoBehaviour
         webViewController.RunJavaScript(js);
     }
 
-    private static string SanitizeEventName(string eventName)
-    {
-        if (string.IsNullOrWhiteSpace(eventName))
+        private static string SanitizeEventName(string eventName)
         {
-            return DefaultEventName;
+            return WebViewUtility.SanitizeEventName(eventName, DefaultEventName);
         }
 
-        return eventName.Trim().Replace("'", "\\'");
-    }
-
-    [System.Serializable]
-    private class WidgetVisibilityPayload
-    {
-        public string type;
-        public string widgetId;
-        public bool visible;
+        [System.Serializable]
+        private class WidgetVisibilityPayload
+        {
+            public string type;
+            public string widgetId;
+            public bool visible;
+        }
     }
 }

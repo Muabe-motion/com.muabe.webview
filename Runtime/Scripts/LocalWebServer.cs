@@ -9,63 +9,66 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class LocalWebServer : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[LocalWebServer]";
-
-    public enum ContentRootSource
+    public class LocalWebServer : MonoBehaviour
     {
-        StreamingAssets,
-        PersistentDataPath,
-        CustomAbsolute
-    }
+        private const string LogPrefix = WebViewConstants.LogPrefixServer;
 
-    private static readonly Dictionary<string, byte[]> AndroidStreamingCache = new Dictionary<string, byte[]>();
-    private static readonly object AndroidCacheLock = new object();
-    private static bool androidCacheReady;
+        public enum ContentRootSource
+        {
+            StreamingAssets,
+            PersistentDataPath,
+            CustomAbsolute
+        }
 
-    private static LocalWebServer instance;
+        private static readonly Dictionary<string, byte[]> AndroidStreamingCache = new Dictionary<string, byte[]>();
+        private static readonly object AndroidCacheLock = new object();
+        private static bool androidCacheReady;
 
-    [Header("Server")]
-    [Tooltip("로컬 서버가 사용할 포트 번호")]
-    public int port = 8088;
+        private static LocalWebServer instance;
 
-    [SerializeField]
-    [Tooltip("씬 시작 시 자동으로 서버를 기동할지 여부")]
-    private bool autoStartOnStart = false;
+        [Header("Server")]
+        [Tooltip("로컬 서버가 사용할 포트 번호")]
+        public int port = WebViewConstants.DefaultServerPort;
 
-    [SerializeField]
-    [Tooltip("요청 경로가 폴더이거나 빈 문자열일 때 제공할 기본 문서 이름")]
-    private string defaultDocument = "index.html";
+        [SerializeField]
+        [Tooltip("씬 시작 시 자동으로 서버를 기동할지 여부")]
+        private bool autoStartOnStart = false;
 
-    [SerializeField]
-    [Tooltip("요청과 응답 정보를 콘솔에 로그로 출력할지 여부")]
-    private bool logRequests = false;
+        [SerializeField]
+        [Tooltip("요청 경로가 폴더이거나 빈 문자열일 때 제공할 기본 문서 이름")]
+        private string defaultDocument = WebViewConstants.DefaultDocument;
 
-    [Header("콘텐츠 경로 설정")]
-    [SerializeField]
-    [Tooltip("콘텐츠 파일이 위치한 기본 위치")]
-    private ContentRootSource contentSource = ContentRootSource.PersistentDataPath;
+        [SerializeField]
+        [Tooltip("요청과 응답 정보를 콘솔에 로그로 출력할지 여부")]
+        private bool logRequests = false;
 
-    [SerializeField]
-    [Tooltip("ContentRootSource가 CustomAbsolute일 때 사용할 절대 경로")]
-    private string customAbsoluteContentRoot = string.Empty;
+        [Header("콘텐츠 경로 설정")]
+        [SerializeField]
+        [Tooltip("콘텐츠 파일이 위치한 기본 위치")]
+        private ContentRootSource contentSource = ContentRootSource.PersistentDataPath;
 
-    [SerializeField]
-    [Tooltip("Android에서 사용할 파일 리스트 텍스트(선택). 상대 경로로 지정하며, 줄마다 파일 경로를 작성합니다.")]
-    private string androidPreloadListFile = string.Empty;
+        [SerializeField]
+        [Tooltip("ContentRootSource가 CustomAbsolute일 때 사용할 절대 경로")]
+        private string customAbsoluteContentRoot = string.Empty;
 
-    [SerializeField]
-    [Tooltip("파일 리스트에서 주석으로 취급할 문자. 기본은 #")]
-    private char androidPreloadListCommentChar = '#';
+        [SerializeField]
+        [Tooltip("Android에서 사용할 파일 리스트 텍스트(선택). 상대 경로로 지정하며, 줄마다 파일 경로를 작성합니다.")]
+        private string androidPreloadListFile = string.Empty;
 
-    private TcpListener tcpListener;
-    private Thread listenerThread;
-    private bool isRunning;
-    private string contentRootOverride;
-    private string cachedContentRootFullPath;
-    private string routePrefix = string.Empty;
-    public bool IsRunning => isRunning;
+        [SerializeField]
+        [Tooltip("파일 리스트에서 주석으로 취급할 문자. 기본은 #")]
+        private char androidPreloadListCommentChar = WebViewConstants.DefaultCommentChar;
+
+        private TcpListener tcpListener;
+        private Thread listenerThread;
+        private bool isRunning;
+        private string contentRootOverride;
+        private string cachedContentRootFullPath;
+        private string routePrefix = string.Empty;
+        
+        public bool IsRunning => isRunning;
 
     private void Awake()
     {
@@ -764,8 +767,9 @@ public class LocalWebServer : MonoBehaviour
         }
     }
 
-    private void OnApplicationQuit()
-    {
-        StopServer();
+        private void OnApplicationQuit()
+        {
+            StopServer();
+        }
     }
 }

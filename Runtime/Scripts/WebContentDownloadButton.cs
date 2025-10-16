@@ -3,122 +3,103 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Button))]
-public class WebContentDownloadButton : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[WebContentDownloadButton]";
-    [SerializeField]
-    private WebContentDownloadManager installer;
-
-    [SerializeField]
-    private WebContentLaunchButton launchButton;
-
-    [Header("다운로드 입력")]
-    [SerializeField]
-    [Tooltip("다운로드에 사용할 ZIP 파일 URL")]
-    private string downloadUrl;
-
-    [SerializeField]
-    [Tooltip("콘텐츠 버전(비워두면 기존 설정 유지)")]
-    private string remoteVersionOverride = string.Empty;
-
-    [SerializeField]
-    [Tooltip("다운로드 시작 시 표시할 텍스트 (선택 사항)")]
-    private string downloadingLabel = "다운로드 중...";
-
-    [SerializeField]
-    [Tooltip("다운로드 완료 시 표시할 텍스트 (선택 사항)")]
-    private string completedLabel = "다운로드 완료";
-
-    [SerializeField]
-    [Tooltip("다운로드 실패 시 표시할 텍스트 (선택 사항)")]
-    private string failedLabel = "다운로드 실패";
-
-    [SerializeField]
-    [Tooltip("이미 다운로드된 상태일 때 표시할 텍스트")]
-    private string alreadyDownloadedLabel = "이미 다운로드됨";
-
-    [SerializeField]
-    [Tooltip("버튼 상태 변화를 표시할 UI Text")]
-    private Text statusText;
-
-    [SerializeField]
-    [Tooltip("버튼 자체에 표시할 텍스트 (선택 사항)")]
-    private Text buttonLabel;
-
-    [SerializeField]
-    [Tooltip("항상 새로 다운로드할지 여부")]
-    private bool forceDownloadEveryTime = false;
-
-    [SerializeField]
-    [Tooltip("캐시된 콘텐츠를 사용할 때 표시할 텍스트")]
-    private string cachedLabel = "캐시에서 불러오는 중...";
-
-    [SerializeField]
-    private UnityEvent onDownloadStarted = new UnityEvent();
-
-    [SerializeField]
-    private UnityEvent onDownloadCompleted = new UnityEvent();
-
-    [SerializeField]
-    private UnityEvent onDownloadFailed = new UnityEvent();
-
-    private Button button;
-    private bool eventsSubscribed;
-    private bool usingCachedContent;
-    private string originalButtonLabel;
-    private string originalStatusLabel;
-
-    private void Awake()
+    [RequireComponent(typeof(Button))]
+    public class WebContentDownloadButton : WebViewButtonBase
     {
-        button = GetComponent<Button>();
-        AutoAssignReferences();
-        ApplyConfigurationOverrides();
-        ResetStatusLabel();
-        button.onClick.AddListener(OnButtonClicked);
-        Debug.Log($"{LogPrefix} Awake (button={name})");
-    }
+        private const string LogPrefix = WebViewConstants.LogPrefixDownloadButton;
 
-    private void Reset()
-    {
-        AutoAssignReferences();
-        ApplyConfigurationOverrides();
-    }
+        [SerializeField]
+        private WebContentDownloadManager installer;
 
-    private void OnValidate()
-    {
-        AutoAssignReferences();
-        ApplyConfigurationOverrides();
-    }
+        [SerializeField]
+        private WebContentLaunchButton launchButton;
 
-    private void AutoAssignReferences()
-    {
-        if (installer == null)
+        [Header("다운로드 입력")]
+        [SerializeField]
+        [Tooltip("다운로드에 사용할 ZIP 파일 URL")]
+        private string downloadUrl;
+
+        [SerializeField]
+        [Tooltip("콘텐츠 버전(비워두면 기존 설정 유지)")]
+        private string remoteVersionOverride = string.Empty;
+
+        [Header("라벨 설정")]
+        [SerializeField]
+        [Tooltip("다운로드 시작 시 표시할 텍스트")]
+        private string downloadingLabel = "다운로드 중...";
+
+        [SerializeField]
+        [Tooltip("다운로드 완료 시 표시할 텍스트")]
+        private string completedLabel = "다운로드 완료";
+
+        [SerializeField]
+        [Tooltip("다운로드 실패 시 표시할 텍스트")]
+        private string failedLabel = "다운로드 실패";
+
+        [SerializeField]
+        [Tooltip("이미 다운로드된 상태일 때 표시할 텍스트")]
+        private string alreadyDownloadedLabel = "이미 다운로드됨";
+
+        [SerializeField]
+        [Tooltip("캐시된 콘텐츠를 사용할 때 표시할 텍스트")]
+        private string cachedLabel = "캐시에서 불러오는 중...";
+
+        [Header("옵션")]
+        [SerializeField]
+        [Tooltip("항상 새로 다운로드할지 여부")]
+        private bool forceDownloadEveryTime = false;
+
+        [Header("이벤트")]
+        [SerializeField]
+        private UnityEvent onDownloadStarted = new UnityEvent();
+
+        [SerializeField]
+        private UnityEvent onDownloadCompleted = new UnityEvent();
+
+        [SerializeField]
+        private UnityEvent onDownloadFailed = new UnityEvent();
+
+        private bool eventsSubscribed;
+        private bool usingCachedContent;
+
+        protected override void Awake()
         {
-            installer = GetComponentInParent<WebContentDownloadManager>();
-            if (installer != null)
+            base.Awake();
+            AutoAssignReferences();
+            ApplyConfigurationOverrides();
+            WebViewUtility.Log(LogPrefix, $"Awake (button={name})");
+        }
+
+        private void Reset()
+        {
+            AutoAssignReferences();
+            ApplyConfigurationOverrides();
+        }
+
+        private void OnValidate()
+        {
+            AutoAssignReferences();
+            ApplyConfigurationOverrides();
+        }
+
+        private void AutoAssignReferences()
+        {
+            if (installer == null)
             {
-                Debug.Log($"{LogPrefix} Auto-assigned installer: {installer.name}");
+                installer = GetComponentInParent<WebContentDownloadManager>();
+                if (installer != null)
+                {
+                    WebViewUtility.Log(LogPrefix, $"Auto-assigned installer: {installer.name}");
+                }
+            }
+
+            if (launchButton == null)
+            {
+                launchButton = GetComponentInParent<WebContentLaunchButton>();
             }
         }
-
-        if (launchButton == null)
-        {
-            launchButton = GetComponentInParent<WebContentLaunchButton>();
-        }
-
-        if (buttonLabel == null)
-        {
-            buttonLabel = GetComponentInChildren<Text>(true);
-        }
-
-        if (statusText == null)
-        {
-            statusText = buttonLabel;
-        }
-
-        CacheOriginalButtonLabel();
-    }
 
     private void OnEnable()
     {
@@ -132,11 +113,11 @@ public class WebContentDownloadButton : MonoBehaviour
         UnsubscribeInstallerEvents();
     }
 
-    private void OnDestroy()
-    {
-        button.onClick.RemoveListener(OnButtonClicked);
-        UnsubscribeInstallerEvents();
-    }
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            UnsubscribeInstallerEvents();
+        }
 
     private void SubscribeInstallerEvents()
     {
@@ -168,16 +149,16 @@ public class WebContentDownloadButton : MonoBehaviour
         eventsSubscribed = false;
     }
 
-    private void OnButtonClicked()
-    {
-        if (installer == null)
+        protected override void OnButtonClicked()
         {
-            Debug.LogError("[WebContentDownloadButton] WebContentDownloadManager reference is missing.");
-            return;
-        }
+            if (installer == null)
+            {
+                WebViewUtility.LogError(LogPrefix, "WebContentDownloadManager reference is missing.");
+                return;
+            }
 
-        ApplyConfigurationOverrides();
-        button.interactable = false;
+            ApplyConfigurationOverrides();
+            SetButtonInteractable(false);
         bool hasCache = installer.HasInstalledContent();
         bool force = forceDownloadEveryTime && hasCache;
         if (hasCache && !force)
@@ -220,112 +201,68 @@ public class WebContentDownloadButton : MonoBehaviour
         Debug.Log($"{LogPrefix} Install started");
     }
 
-    private void HandleInstallCompleted()
-    {
-        UpdateStatusLabel(completedLabel);
-        button.interactable = !forceDownloadEveryTime;
-        onDownloadCompleted.Invoke();
-        Debug.Log($"{LogPrefix} Install completed");
-        usingCachedContent = false;
-        if (installer.HasInstalledContent())
+        private void HandleInstallCompleted()
         {
-            HandleAlreadyDownloaded();
-        }
-    }
-
-    private void HandleInstallFailed()
-    {
-        UpdateStatusLabel(failedLabel);
-        button.interactable = true;
-        onDownloadFailed.Invoke();
-        Debug.LogWarning($"{LogPrefix} Install failed");
-        usingCachedContent = false;
-        RefreshButtonState();
-    }
-
-    private void UpdateStatusLabel(string label)
-    {
-        if (string.IsNullOrEmpty(label))
-        {
-            return;
-        }
-
-        if (statusText != null)
-        {
-            statusText.text = label;
-        }
-
-        if (buttonLabel != null)
-        {
-            buttonLabel.text = label;
-        }
-    }
-
-    private void CacheOriginalButtonLabel()
-    {
-        if (buttonLabel != null)
-        {
-            originalButtonLabel = buttonLabel.text;
-        }
-
-        if (statusText != null)
-        {
-            originalStatusLabel = statusText.text;
-        }
-    }
-
-    public void ResetStatusLabel()
-    {
-        RefreshButtonState();
-        if (buttonLabel != null && !string.IsNullOrEmpty(originalButtonLabel))
-        {
-            buttonLabel.text = originalButtonLabel;
-        }
-
-        if (statusText != null && !string.IsNullOrEmpty(originalStatusLabel))
-        {
-            statusText.text = originalStatusLabel;
-        }
-    }
-
-    public void SetDownloadUrl(string url)
-    {
-        downloadUrl = string.IsNullOrWhiteSpace(url) ? string.Empty : url.Trim();
-        ApplyConfigurationOverrides();
-    }
-
-    private void RefreshButtonState()
-    {
-        if (installer != null && installer.HasInstalledContent())
-        {
-            HandleAlreadyDownloaded();
-        }
-        else
-        {
-            button.interactable = true;
-            if (!string.IsNullOrEmpty(originalButtonLabel))
+            UpdateStatusLabel(completedLabel);
+            SetButtonInteractable(!forceDownloadEveryTime);
+            onDownloadCompleted.Invoke();
+            WebViewUtility.Log(LogPrefix, "Install completed");
+            usingCachedContent = false;
+            if (installer.HasInstalledContent())
             {
-                UpdateStatusLabel(originalButtonLabel);
+                HandleAlreadyDownloaded();
             }
         }
-    }
 
-    private void HandleAlreadyDownloaded()
-    {
-        button.interactable = false;
-        UpdateStatusLabel(string.IsNullOrEmpty(alreadyDownloadedLabel) ? completedLabel : alreadyDownloadedLabel);
-    }
-
-    private void ApplyConfigurationOverrides()
-    {
-        if (installer != null)
+        private void HandleInstallFailed()
         {
-            installer.SetRemoteVersion(remoteVersionOverride);
+            UpdateStatusLabel(failedLabel);
+            SetButtonInteractable(true);
+            onDownloadFailed.Invoke();
+            WebViewUtility.LogWarning(LogPrefix, "Install failed");
+            usingCachedContent = false;
+            RefreshButtonState();
         }
 
-        if (launchButton != null)
+        public void SetDownloadUrl(string url)
         {
-            launchButton.ApplyConfigurationOverrides();
+            downloadUrl = string.IsNullOrWhiteSpace(url) ? string.Empty : url.Trim();
+            ApplyConfigurationOverrides();
+        }
+
+        private void RefreshButtonState()
+        {
+            if (installer != null && installer.HasInstalledContent())
+            {
+                HandleAlreadyDownloaded();
+            }
+            else
+            {
+                SetButtonInteractable(true);
+                if (!string.IsNullOrEmpty(originalButtonLabel))
+                {
+                    UpdateStatusLabel(originalButtonLabel);
+                }
+            }
+        }
+
+        private void HandleAlreadyDownloaded()
+        {
+            SetButtonInteractable(false);
+            UpdateStatusLabel(string.IsNullOrEmpty(alreadyDownloadedLabel) ? completedLabel : alreadyDownloadedLabel);
+        }
+
+        private void ApplyConfigurationOverrides()
+        {
+            if (installer != null)
+            {
+                installer.SetRemoteVersion(remoteVersionOverride);
+            }
+
+            if (launchButton != null)
+            {
+                launchButton.ApplyConfigurationOverrides();
+            }
         }
     }
 }

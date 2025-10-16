@@ -4,10 +4,12 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Button))]
-public class WebContentLaunchButton : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[WebContentLaunchButton]";
+    [RequireComponent(typeof(Button))]
+    public class WebContentLaunchButton : WebViewButtonBase
+    {
+        private const string LogPrefix = WebViewConstants.LogPrefixLaunchButton;
 
     [Header("필수 참조")]
     [SerializeField]
@@ -54,12 +56,7 @@ public class WebContentLaunchButton : MonoBehaviour
     [SerializeField]
     private bool disableButtonAfterSuccess = false;
 
-    [Header("텍스트 설정")]
-    [SerializeField]
-    private Text statusText;
-
-    [SerializeField]
-    private Text buttonLabel;
+        [Header("텍스트 설정")]
 
     [SerializeField]
     private string loadingLabel = "로드 중...";
@@ -81,23 +78,18 @@ public class WebContentLaunchButton : MonoBehaviour
     public UnityEvent onLoadCompleted;
     public UnityEvent onLoadFailed;
 
-    private Button button;
-    private Coroutine loadRoutine;
-    private string originalButtonLabel;
-    private string originalStatusLabel;
-    private bool wasSuccessful;
+        private Coroutine loadRoutine;
+        private bool wasSuccessful;
 
-    private void Awake()
-    {
-        button = GetComponent<Button>();
-        AutoAssignReferences();
-        CacheOriginalLabels();
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
-        button.onClick.AddListener(HandleButtonClicked);
-        RefreshButtonState();
-        Debug.Log($"{LogPrefix} Awake (configureServerOnLoad={configureServerOnLoad}, startServerIfNeeded={startServerIfNeeded})");
-    }
+        protected override void Awake()
+        {
+            base.Awake();
+            AutoAssignReferences();
+            NormalizeOverrides();
+            ApplyConfigurationOverrides();
+            RefreshButtonState();
+            WebViewUtility.Log(LogPrefix, $"Awake (configureServerOnLoad={configureServerOnLoad}, startServerIfNeeded={startServerIfNeeded})");
+        }
 
     private void Reset()
     {
@@ -118,44 +110,33 @@ public class WebContentLaunchButton : MonoBehaviour
         ApplyConfigurationOverrides();
     }
 
-    private void AutoAssignReferences()
-    {
-        if (installer == null)
+        private void AutoAssignReferences()
         {
-            installer = GetComponentInParent<WebContentDownloadManager>();
-        }
+            if (installer == null)
+            {
+                installer = GetComponentInParent<WebContentDownloadManager>();
+            }
 
-        if (targetServer == null)
-        {
-            targetServer = GetComponentInParent<LocalWebServer>();
-        }
+            if (targetServer == null)
+            {
+                targetServer = GetComponentInParent<LocalWebServer>();
+            }
 
-        if (targetWebView == null)
-        {
-            targetWebView = GetComponentInParent<WebViewController>();
             if (targetWebView == null)
             {
-                targetWebView = GetComponentInChildren<WebViewController>(true);
+                targetWebView = GetComponentInParent<WebViewController>();
+                if (targetWebView == null)
+                {
+                    targetWebView = GetComponentInChildren<WebViewController>(true);
+                }
             }
+
+            NormalizeOverrides();
+            ApplyConfigurationOverrides();
         }
 
-        if (buttonLabel == null)
+        protected override void OnButtonClicked()
         {
-            buttonLabel = GetComponentInChildren<Text>(true);
-        }
-
-        if (statusText == null)
-        {
-            statusText = buttonLabel;
-        }
-
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
-
-    }
-
-    private void HandleButtonClicked()
-    {
         if (loadRoutine != null)
         {
             return;
@@ -165,7 +146,7 @@ public class WebContentLaunchButton : MonoBehaviour
         ApplyConfigurationOverrides();
         if (!HasInstallPrepared())
         {
-            UpdateStatus(notReadyLabel);
+            UpdateStatusLabel(notReadyLabel);
             onLoadFailed?.Invoke();
             return;
         }
@@ -193,12 +174,12 @@ public class WebContentLaunchButton : MonoBehaviour
         return false;
     }
 
-    private IEnumerator LoadRoutine()
-    {
-        button.interactable = false;
-        UpdateStatus(loadingLabel);
-        onLoadStarted?.Invoke();
-        wasSuccessful = false;
+        private IEnumerator LoadRoutine()
+        {
+            SetButtonInteractable(false);
+            UpdateStatusLabel(loadingLabel);
+            onLoadStarted?.Invoke();
+            wasSuccessful = false;
 
         if (configureServerOnLoad)
         {
@@ -207,7 +188,7 @@ public class WebContentLaunchButton : MonoBehaviour
 
         if (startServerIfNeeded && targetServer != null && !targetServer.IsRunning)
         {
-            UpdateStatus(waitingServerLabel);
+            UpdateStatusLabel(waitingServerLabel);
             targetServer.StartServer();
         }
 
@@ -228,10 +209,10 @@ public class WebContentLaunchButton : MonoBehaviour
 
         if (targetWebView == null)
         {
-            Debug.LogWarning($"{LogPrefix} targetWebView is not assigned. Cannot load WebView.");
-            UpdateStatus(failedLabel);
+            WebViewUtility.LogWarning(LogPrefix, "targetWebView is not assigned. Cannot load WebView.");
+            UpdateStatusLabel(failedLabel);
             onLoadFailed?.Invoke();
-            button.interactable = true;
+            SetButtonInteractable(true);
             loadRoutine = null;
             yield break;
         }
@@ -242,10 +223,10 @@ public class WebContentLaunchButton : MonoBehaviour
             targetWebView.SetVisible(true);
         }
 
-        UpdateStatus(completedLabel);
-        onLoadCompleted?.Invoke();
-        wasSuccessful = true;
-        button.interactable = !disableButtonAfterSuccess;
+            UpdateStatusLabel(completedLabel);
+            onLoadCompleted?.Invoke();
+            wasSuccessful = true;
+            SetButtonInteractable(!disableButtonAfterSuccess);
         loadRoutine = null;
     }
 
@@ -303,83 +284,31 @@ public class WebContentLaunchButton : MonoBehaviour
         RefreshButtonState();
     }
 
-    private void RefreshButtonState()
-    {
-        if (wasSuccessful && disableButtonAfterSuccess)
+        private void RefreshButtonState()
         {
-            button.interactable = false;
-            UpdateStatus(completedLabel);
-            return;
+            if (wasSuccessful && disableButtonAfterSuccess)
+            {
+                SetButtonInteractable(false);
+                UpdateStatusLabel(completedLabel);
+                return;
+            }
+
+            SetButtonInteractable(true);
+            if (!string.IsNullOrEmpty(originalButtonLabel))
+            {
+                UpdateStatusLabel(originalButtonLabel);
+            }
+            else if (!string.IsNullOrEmpty(originalStatusLabel))
+            {
+                UpdateStatusLabel(originalStatusLabel);
+            }
         }
 
-        button.interactable = true;
-        if (!string.IsNullOrEmpty(originalButtonLabel))
+        private void NormalizeOverrides()
         {
-            UpdateStatus(originalButtonLabel);
+            contentRootSubfolder = WebViewUtility.NormalizeSubfolder(contentRootSubfolder);
+            routePrefix = WebViewUtility.NormalizeRoute(routePrefix);
         }
-        else if (!string.IsNullOrEmpty(originalStatusLabel))
-        {
-            UpdateStatus(originalStatusLabel);
-        }
-    }
-
-    private void UpdateStatus(string message)
-    {
-        if (string.IsNullOrEmpty(message))
-        {
-            return;
-        }
-
-        if (statusText != null)
-        {
-            statusText.text = message;
-        }
-
-        if (buttonLabel != null)
-        {
-            buttonLabel.text = message;
-        }
-    }
-
-    private void CacheOriginalLabels()
-    {
-        if (buttonLabel != null)
-        {
-            originalButtonLabel = buttonLabel.text;
-        }
-
-        if (statusText != null)
-        {
-            originalStatusLabel = statusText.text;
-        }
-    }
-
-    private void NormalizeOverrides()
-    {
-        contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
-        routePrefix = NormalizeRoute(routePrefix);
-    }
-
-    private string NormalizeSubfolder(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        string normalized = value.Trim().Replace('\\', '/');
-        return normalized.Trim('/');
-    }
-
-    private string NormalizeRoute(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value.Trim().Trim('/');
-    }
 
     public void ApplyConfigurationOverrides()
     {
@@ -400,14 +329,9 @@ public class WebContentLaunchButton : MonoBehaviour
         }
     }
 
-    private string BuildWebRootPath(string route)
-    {
-        if (string.IsNullOrEmpty(route))
+        private string BuildWebRootPath(string route)
         {
-            return "/";
+            return WebViewUtility.BuildWebRootPath(route);
         }
-
-        return "/" + route.Trim('/') + "/";
     }
-
 }

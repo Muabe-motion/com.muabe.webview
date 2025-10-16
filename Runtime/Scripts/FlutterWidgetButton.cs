@@ -1,75 +1,77 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Button))]
-public class FlutterWidgetButton : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[FlutterWidgetButton]";
+    [RequireComponent(typeof(Button))]
+        public class FlutterWidgetButton : MonoBehaviour
+    {
+        private const string LogPrefix = WebViewConstants.LogPrefixFlutterButton;
 
-    [SerializeField]
-    private FlutterWebBridge bridge;
+        [SerializeField]
+        private FlutterWebBridge bridge;
 
-    [SerializeField]
-    [Tooltip("상위에 없으면 씬 전체에서 FlutterWebBridge를 자동으로 찾습니다.")]
-    private bool autoLocateBridgeInScene = true;
+        [SerializeField]
+        [Tooltip("상위에 없으면 씬 전체에서 FlutterWebBridge를 자동으로 찾습니다.")]
+        private bool autoLocateBridgeInScene = true;
 
-    [SerializeField]
-    [Tooltip("디버그 로그 출력 활성화")] 
-    private bool verboseLogging = false;
+        [SerializeField]
+        [Tooltip("디버그 로그 출력 활성화")] 
+        private bool verboseLogging = false;
 
-    [SerializeField]
-    [Tooltip("제어할 플러터 위젯 ID")]
-    private string widgetId;
+        [SerializeField]
+        [Tooltip("제어할 플러터 위젯 ID")]
+        private string widgetId;
 
     [SerializeField]
     [Tooltip("버튼 클릭 시 실행할 동작")]
-    private ClickMode clickMode = ClickMode.Toggle;
+        private ClickMode clickMode = ClickMode.Toggle;
 
     [SerializeField]
     [Tooltip("ClickMode가 ForceValue일 때 적용할 visible 값")]
-    private bool visibleValue = true;
+        private bool visibleValue = true;
 
     [Header("WebView Overlay")]
     [SerializeField]
     [Tooltip("버튼 영역만큼 WebView 상단 여백을 자동으로 확보합니다.")]
-    private bool reserveWebViewArea = false;
+        private bool reserveWebViewArea = false;
 
     [SerializeField]
     [Tooltip("자동 계산 시 추가로 확보할 여백 (픽셀)")]
-    private float reservePaddingPixels = 12f;
+        private float reservePaddingPixels = 12f;
 
     [SerializeField]
     [Tooltip("자동 계산 기준이 될 RectTransform (미지정 시 현재 버튼)")]
-    private RectTransform reserveTarget;
+        private RectTransform reserveTarget;
 
     [SerializeField]
     [Tooltip("자동 계산 대신 명시적인 상단 여백을 지정합니다. 음수면 자동 계산 결과를 사용합니다.")]
-    private int explicitTopMargin = -1;
+        private int explicitTopMargin = -1;
 
-    private Button cachedButton;
-    private RectTransform cachedRectTransform;
-    private Vector2Int cachedScreenSize;
-    private bool overlayMarginDirty;
-    private bool loggedMissingController;
-    private bool loggedMissingBridge;
-    private static readonly Vector3[] CornerBuffer = new Vector3[4];
+        private Button cachedButton;
+        private RectTransform cachedRectTransform;
+        private Vector2Int cachedScreenSize;
+        private bool overlayMarginDirty;
+        private bool loggedMissingController;
+        private bool loggedMissingBridge;
+        private static readonly Vector3[] CornerBuffer = new Vector3[4];
 
-    private void Awake()
-    {
-        cachedButton = GetComponent<Button>();
-        cachedRectTransform = GetComponent<RectTransform>();
-
-        TryResolveBridge();
-
-        cachedButton.onClick.AddListener(HandleButtonClick);
-
-        if (verboseLogging)
+        private void Awake()
         {
-            Debug.Log($"{LogPrefix} Awake (bridge={(bridge != null ? bridge.name : "null")}, widgetId={widgetId})", this);
-        }
-    }
+            cachedButton = GetComponent<Button>();
+            cachedRectTransform = GetComponent<RectTransform>();
 
-    private void OnValidate()
+            TryResolveBridge();
+
+            cachedButton.onClick.AddListener(HandleButtonClick);
+
+            if (verboseLogging)
+            {
+                WebViewUtility.Log(LogPrefix, $"Awake (bridge={(bridge != null ? bridge.name : "null")}, widgetId={widgetId})", this);
+            }
+        }
+
+        private void OnValidate()
     {
         if (!string.IsNullOrEmpty(widgetId))
         {
@@ -85,7 +87,7 @@ public class FlutterWidgetButton : MonoBehaviour
         overlayMarginDirty = true;
     }
 
-    private void OnDestroy()
+        private void OnDestroy()
     {
         if (cachedButton != null)
         {
@@ -93,14 +95,14 @@ public class FlutterWidgetButton : MonoBehaviour
         }
     }
 
-    private void OnEnable()
+        private void OnEnable()
     {
         cachedScreenSize = new Vector2Int(Screen.width, Screen.height);
         overlayMarginDirty = true;
         TryResolveBridge();
     }
 
-    private void Start()
+        private void Start()
     {
         if (reserveWebViewArea)
         {
@@ -108,7 +110,7 @@ public class FlutterWidgetButton : MonoBehaviour
         }
     }
 
-    private void Update()
+        private void Update()
     {
         if (!reserveWebViewArea)
         {
@@ -145,7 +147,7 @@ public class FlutterWidgetButton : MonoBehaviour
         }
     }
 
-    private void HandleButtonClick()
+        private void HandleButtonClick()
     {
         TryResolveBridge();
 
@@ -185,12 +187,12 @@ public class FlutterWidgetButton : MonoBehaviour
         }
     }
 
-    private void ScheduleOverlayMarginUpdate()
+        private void ScheduleOverlayMarginUpdate()
     {
         overlayMarginDirty = true;
     }
 
-    private void UpdateOverlayMargin()
+        private void UpdateOverlayMargin()
     {
         var controller = bridge != null ? bridge.WebViewController : null;
         if (controller == null)
@@ -245,7 +247,7 @@ public class FlutterWidgetButton : MonoBehaviour
         controller.SetOverlayPaddingTop(topMargin);
     }
 
-    private void TryResolveBridge()
+        private void TryResolveBridge()
     {
         if (bridge != null)
         {
@@ -274,59 +276,35 @@ public class FlutterWidgetButton : MonoBehaviour
         }
     }
 
-    private static FlutterWebBridge FindBridgeInScene()
-    {
-#if UNITY_2022_2_OR_NEWER
-        return FindFirstObjectByType<FlutterWebBridge>(FindObjectsInactive.Include);
-#else
-        return FindObjectOfType<FlutterWebBridge>();
-#endif
-    }
-
-    private void LogExistingBridges()
-    {
-#if UNITY_2022_2_OR_NEWER
-        var candidates = FindObjectsOfType<FlutterWebBridge>(includeInactive: true);
-#else
-        var candidates = FindObjectsOfType<FlutterWebBridge>();
-#endif
-        if (candidates == null || candidates.Length == 0)
+        private static FlutterWebBridge FindBridgeInScene()
         {
-            Debug.LogWarning($"{LogPrefix} No FlutterWebBridge instances found in scene.", this);
-            return;
+            return WebViewUtility.FindObjectInScene<FlutterWebBridge>(true);
         }
 
-        foreach (var candidate in candidates)
+        private void LogExistingBridges()
         {
-            var controller = candidate.WebViewController;
-            var controllerName = controller != null ? controller.name : "null";
-            var path = GetTransformPath(candidate.transform);
-            Debug.Log($"{LogPrefix} Found FlutterWebBridge candidate at '{path}' (controller={controllerName})", candidate);
-        }
-    }
+            var candidates = WebViewUtility.FindObjectsInScene<FlutterWebBridge>(true);
+            if (candidates == null || candidates.Length == 0)
+            {
+                WebViewUtility.LogWarning(LogPrefix, "No FlutterWebBridge instances found in scene.", this);
+                return;
+            }
 
-    private static string GetTransformPath(Transform transform)
-    {
-        if (transform == null)
+            foreach (var candidate in candidates)
+            {
+                var controller = candidate.WebViewController;
+                var controllerName = controller != null ? controller.name : "null";
+                var path = WebViewUtility.GetTransformPath(candidate.transform);
+                WebViewUtility.Log(LogPrefix, $"Found FlutterWebBridge candidate at '{path}' (controller={controllerName})", candidate);
+            }
+        }
+
+        private enum ClickMode
         {
-            return "<null>";
+            Toggle,
+            Show,
+            Hide,
+            ForceValue
         }
-
-        var segments = new System.Collections.Generic.List<string>();
-        while (transform != null)
-        {
-            segments.Add(transform.name);
-            transform = transform.parent;
-        }
-        segments.Reverse();
-        return string.Join("/", segments);
-    }
-
-    private enum ClickMode
-    {
-        Toggle,
-        Show,
-        Hide,
-        ForceValue
     }
 }

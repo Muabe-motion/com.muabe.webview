@@ -2,12 +2,14 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-public class WebViewController : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[WebViewController]";
-    [Header("Local HTTP Server")]
-    [Tooltip("로컬 서버 포트")]
-    public int serverPort = 8088;
+    public class WebViewController : MonoBehaviour
+    {
+        private const string LogPrefix = WebViewConstants.LogPrefixViewController;
+        [Header("Local HTTP Server")]
+        [Tooltip("로컬 서버 포트")]
+        public int serverPort = WebViewConstants.DefaultServerPort;
 
     [Tooltip("플러터 웹이 서비스되는 경로(예: /flutter/)"), HideInInspector]
     [SerializeField]
@@ -79,9 +81,9 @@ public class WebViewController : MonoBehaviour
         }
     }
 
-    private IEnumerator InitializeWebView()
-    {
-        yield return new WaitForSeconds(0.5f);
+        private IEnumerator InitializeWebView()
+        {
+            yield return new WaitForSeconds(WebViewConstants.WebViewInitDelay);
 
         initialUrl = BuildInitialUrl();
         Debug.Log($"{LogPrefix} InitializeWebView coroutine started. Platform: {Application.platform}, Initial URL: {initialUrl}");
@@ -383,11 +385,12 @@ public class WebViewController : MonoBehaviour
         ApplySafeAreaMargins();
     }
 
-    public void GetOverlayPadding(out int left, out int top, out int right, out int bottom)
-    {
-        left = overlayPaddingLeft;
-        top = overlayPaddingTop;
-        right = overlayPaddingRight;
-        bottom = overlayPaddingBottom;
+        public void GetOverlayPadding(out int left, out int top, out int right, out int bottom)
+        {
+            left = overlayPaddingLeft;
+            top = overlayPaddingTop;
+            right = overlayPaddingRight;
+            bottom = overlayPaddingBottom;
+        }
     }
 }

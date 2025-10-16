@@ -6,9 +6,11 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
 
-public class WebContentDownloadManager : MonoBehaviour
+namespace Muabe.WebView
 {
-    private const string LogPrefix = "[WebContentDownloadManager]";
+    public class WebContentDownloadManager : MonoBehaviour
+    {
+        private const string LogPrefix = WebViewConstants.LogPrefixDownloadManager;
     [Header("다운로드 설정")]
     [SerializeField, HideInInspector]
     [Tooltip("원격에서 받을 ZIP 파일 URL (선택). 비워두면 DownloadContent 호출 시 전달된 URL을 사용합니다.")]
@@ -24,9 +26,9 @@ public class WebContentDownloadManager : MonoBehaviour
     [SerializeField, HideInInspector]
     private string remoteVersion = string.Empty;
 
-    [SerializeField]
-    [Tooltip("버전 정보를 저장할 파일 이름")]
-    private string versionFileName = ".webcontent-version";
+        [SerializeField]
+        [Tooltip("버전 정보를 저장할 파일 이름")]
+        private string versionFileName = WebViewConstants.DefaultVersionFileName;
 
     [SerializeField]
     [Tooltip("컴포넌트가 시작될 때 자동으로 설치를 시도합니다.")]
@@ -293,22 +295,15 @@ public class WebContentDownloadManager : MonoBehaviour
         activeDownloadUrl = null;
     }
 
-    private string NormalizeVersion(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
-    }
-
-    private string NormalizeSubfolder(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
+        private string NormalizeVersion(string value)
         {
-            return string.Empty;
+            return WebViewUtility.NormalizeVersion(value);
         }
 
-        string normalized = value.Trim().Replace('\\', '/');
-        normalized = normalized.Trim('/');
-        return normalized;
-    }
+        private string NormalizeSubfolder(string value)
+        {
+            return WebViewUtility.NormalizeSubfolder(value);
+        }
 
     private void InstallFromZip(byte[] zipData, string installPath)
     {
@@ -352,5 +347,5 @@ public class WebContentDownloadManager : MonoBehaviour
         }
         Debug.Log($"{LogPrefix} Extracted {archive.Entries.Count} entries.");
     }
-
+    }
 }

@@ -1,17 +1,25 @@
 # Muabe Interactive WebView
 
-Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹뷰, 로컬 웹 서버, 원격 콘텐츠 배포 흐름을 한 번에 구성할 수 있도록 도와줍니다. 하나의 패키지로 Android, iOS, WebGL 환경에서 동일한 워크플로를 유지하면서 Flutter·React 등으로 제작한 웹 앱을 손쉽게 배포할 수 있습니다.
+[![Unity Version](https://img.shields.io/badge/Unity-2021.3%2B-blue)](https://unity.com/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.3-orange)](package.json)
 
-## 주요 기능
-- `gree/unity-webview` 기반 커스텀 `WebViewObject` 프리팹 및 네이티브 플러그인 제공
-- `LocalWebServer`로 퍼시스턴트 스토리지에 있는 정적 파일을 로컬 HTTP 서버로 노출
-- `WebContentDownloadManager`가 원격 ZIP 콘텐츠를 다운로드·검증·설치하고 버전 관리
-- `WebContentDownloadButton`, `PermissionRequester` 등 UI/권한 유틸리티 포함
-- Editor 확장으로 스크립팅 define 설정과 빌드 후 처리 자동화
+Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹뷰, 로컬 웹 서버, 원격 콘텐츠 배포 흐름을 한 번에 구성할 수 있도록 도와줍니다. 하나의 패키지로 Android, iOS 환경에서 동일한 워크플로를 유지하면서 Flutter·React 등으로 제작한 웹 앱을 손쉽게 배포할 수 있습니다.
+
+> **📖 상세 문서**: 전체 아키텍처와 컴포넌트 설명은 [ARCHITECTURE.md](ARCHITECTURE.md)를 참고하세요.
+
+## ✨ 주요 기능
+
+### 핵심 기능
+- 🌐 **네이티브 WebView**: `gree/unity-webview` 기반 커스텀 WebView 구현
+- 🖥️ **로컬 HTTP 서버**: Unity 내장 경량 서버로 웹 콘텐츠 제공
+- 📦 **원격 콘텐츠 관리**: ZIP 파일 다운로드, 버전 관리, 자동 업데이트
+- 🔄 **Unity ↔ Flutter 브리지**: 양방향 메시지 통신 지원
+- 🎮 **UI 컴포넌트**: 드래그 앤 드롭으로 쉽게 구성 가능한 버튼들
 
 ## 지원 환경
 - Unity 2021.3 이상
-- 플랫폼: Android 7.0+, iOS 13+, WebGL
+- 플랫폼: Android 7.0+, iOS 13+
 - 의존성: [unity-webview](https://github.com/gree/unity-webview) (패키지에 포함)
 
 ## GitHub에서 설치
@@ -29,25 +37,70 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 
 로컬 패키지로 쓰고 싶다면 이 저장소를 클론한 뒤 `Packages/com.muabe.webview` 경로를 선택해 `Add package from disk...`를 실행하면 됩니다.
 
-## 패키지 구성
-- `Runtime/LocalWebServer` : 퍼시스턴트 폴더 또는 StreamingAssets를 호스팅하는 경량 HTTP 서버
-- `Runtime/WebContentDownloadManager` : ZIP 아카이브 다운로드, 버전 및 캐시 관리
-- `Runtime/WebContentLaunchButton` : 설치된 콘텐츠를 서버/웹뷰에 적용하는 UI 버튼
-- `Runtime/WebViewController` : 웹뷰 초기 URL 로드, 서버 상태 감지, 메시지 브리지
-- `Runtime/UI/WebContentDownloadButton` : UI 버튼으로 설치/갱신 이벤트 트리거
-- `Runtime/PermissionRequester` : 카메라·마이크 등 런타임 권한 요청
-- `Editor` 스크립트 : Android defines 관리와 빌드 파이프라인 훅 제공
+## 📦 패키지 구성
 
-각 구성 요소의 필드는 동일 GameObject 내 다른 컴포넌트를 자동으로 참조하지만, Inspector에서 직접 연결해 명시적으로 구성할 수 있습니다.
+### Core Components (핵심 컴포넌트)
+- **`LocalWebServer`**: 퍼시스턴트 폴더 또는 StreamingAssets를 호스팅하는 경량 HTTP 서버
+- **`WebContentDownloadManager`**: ZIP 아카이브 다운로드, 버전 및 캐시 관리
+- **`WebViewController`**: 웹뷰 초기 URL 로드, 서버 상태 감지, 마진 관리
+- **`FlutterWebBridge`**: Unity ↔ Flutter 양방향 메시지 브리지
 
-## 빠른 시작
-자세한 단계별 설명은 [설치 및 설정 가이드](Documentation~/setup.md)에서 확인할 수 있습니다. 아래 순서만 따라도 기본 구성이 완료됩니다.
-1. **기본 컴포넌트 배치** – 하나의 GameObject에 `LocalWebServer`, `WebContentDownloadManager`, `WebViewController`를 붙입니다. 서버 포트와 설치 폴더(`installFolderName`) 정도만 설정하면 됩니다.
-2. **다운로드 버튼** – UI 버튼에 `WebContentDownloadButton`을 붙이고 위 GameObject의 컴포넌트들을 연결합니다. Inspector에서 `downloadUrl`, `remoteVersion`만 입력하면 나머지 값은 자동으로 관리됩니다.
-3. **로드 버튼** – 다른 UI 버튼에 `WebContentLaunchButton`을 붙이고 동일한 컴포넌트들을 연결합니다. 아래 값들을 Inspector에서 입력하면 서버·웹뷰가 함께 갱신됩니다:
-   - `contentRootSubfolder`: ZIP 내부에서 실제 웹 앱이 위치한 폴더 이름 (예: `flutter`, `build/web`).
-   - `routePrefix`: 로컬 서버가 제공할 URL 경로 접두사. `http://localhost:포트/routePrefix/` 형태로 노출되며, 웹뷰 루트 경로도 동일한 값으로 자동 구성됩니다(예: `/routePrefix/`).
-4. **실행** – 플레이 모드에서 다운로드 버튼을 눌러 ZIP을 설치한 뒤, 로드 버튼으로 로컬 서버를 기동하고 웹뷰를 노출합니다. 권한 안내가 필요하면 `PermissionRequester`를 추가하세요.
+### UI Components (UI 컴포넌트)
+- **`WebContentDownloadButton`**: 콘텐츠 다운로드 버튼
+- **`WebContentLaunchButton`**: 서버 시작 및 WebView 로드 버튼
+- **`FlutterWidgetButton`**: Flutter 위젯 제어 버튼
+
+### Utilities (유틸리티)
+- **`WebViewConstants`**: 모든 상수 통합 관리
+- **`WebViewUtility`**: 15+ 공통 유틸리티 함수
+- **`WebViewButtonBase`**: 버튼 베이스 클래스
+- **`PermissionRequester`**: 카메라·마이크 등 런타임 권한 요청
+
+### Editor Extensions
+- **`WebViewDefines`**: Android defines 자동 관리
+- **`UnityWebViewPostprocessBuild`**: 빌드 후처리 자동화
+
+> 💡 **자동 참조**: 대부분의 컴포넌트 필드는 동일 GameObject 내에서 자동으로 참조됩니다.
+
+## 🚀 빠른 시작
+
+### 1단계: GameObject 생성 및 컴포넌트 추가
+
+```csharp
+// 새로운 GameObject 생성
+GameObject webViewManager = new GameObject("WebViewManager");
+
+// 핵심 컴포넌트 추가
+webViewManager.AddComponent<Muabe.WebView.LocalWebServer>();
+webViewManager.AddComponent<Muabe.WebView.WebContentDownloadManager>();
+webViewManager.AddComponent<Muabe.WebView.WebViewController>();
+webViewManager.AddComponent<Muabe.WebView.FlutterWebBridge>(); // 선택사항
+
+// 씬 전환 시에도 유지
+DontDestroyOnLoad(webViewManager);
+```
+
+### 2단계: UI 버튼 설정
+
+1. **다운로드 버튼**
+   - UI Button 생성 → `WebContentDownloadButton` 컴포넌트 추가
+   - Inspector에서 설정:
+     - `Download Url`: ZIP 파일 URL (예: `https://example.com/app.zip`)
+     - `Remote Version Override`: 버전 문자열 (예: `1.0.0`)
+
+2. **실행 버튼**
+   - UI Button 생성 → `WebContentLaunchButton` 컴포넌트 추가
+   - Inspector에서 설정:
+     - `Content Root Subfolder`: ZIP 내 웹 앱 폴더명 (예: `flutter`)
+     - `Route Prefix`: URL 경로 (예: `flutter`)
+
+### 3단계: 실행
+
+1. 다운로드 버튼 클릭 → ZIP 다운로드 및 설치
+2. 실행 버튼 클릭 → 서버 시작 및 WebView 로드
+3. 완료! 웹 앱이 실행됩니다 🎉
+
+> 📖 **자세한 가이드**: [설치 및 설정 가이드](Documentation~/setup.md) 참고
 
 ## 원격 콘텐츠 배포 워크플로
 1. Flutter·React·Vue 등으로 제작한 웹 앱을 빌드한 다음 결과물을 ZIP으로 압축합니다. ZIP 루트 폴더 이름은 `contentRootSubfolder` 값과 일치해야 합니다.
@@ -58,8 +111,7 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 
 ## 플랫폼별 체크리스트
 - **Android**: `UNITYWEBVIEW_ANDROID_USES_CLEARTEXT_TRAFFIC` define이 자동으로 추가됩니다. HTTP를 사용하면 네트워크 정책을 확인하고, 추가 권한이 필요하면 `PermissionRequester`를 활용하세요.
-- **iOS**: `enableWKWebView` 옵션을 켜면 WKWebView가 활성화됩니다. ATS 정책에 맞춰 HTTPS 콘텐츠를 사용하세요.
-- **WebGL**: `unity-webview-webgl-plugin.jslib`가 자동 포함됩니다. WebGL 빌드는 로컬 서버 대신 호스팅 환경에 맞춰 정적 파일을 직접 서빙하는 방식도 고려할 수 있습니다.
+- **iOS**: `enableWKWebView` 옵션을 켜면 WKWebView가 활성화됩니다. HTTP를 이용한 콘텐츠 사용을 위해서는 `Edit > Project Settings > Player > iOS > Other Settings > Configuration` 섹션에서 **Allow downloads over HTTP** 값을 **Always allowed**로 설정하세요.
 
 ## 문제 해결
 - 웹뷰가 빈 화면일 경우: `LocalWebServer` 로그와 `WebContentDownloadManager`의 설치 로그(에디터 콘솔)를 확인하고 포트/라우트가 일치하는지 점검하세요.
@@ -67,8 +119,63 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 - Android에서 HTTP 요청 차단: HTTPS URL을 사용하거나 네트워크 보안 정책(네트워크 보안 구성)을 조정하세요.
 - 캐시 무효화: 새 버전을 강제로 받으려면 `WebContentDownloadButton`의 `remoteVersion` 값을 증가시키거나 `Force Download Every Time` 옵션을 활성화합니다.
 
-## 추가 문서
-- [설치 및 설정 가이드](Documentation~/setup.md)
+## 📚 문서
 
-## 라이선스
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - 전체 아키텍처 및 컴포넌트 상세 설명
+- **[설치 및 설정 가이드](Documentation~/setup.md)** - 단계별 설치 및 설정 방법
+- **[README.md](README.md)** - 이 문서
+
+## 🔧 코드 예시
+
+### Unity ↔ Flutter 통신
+
+**Unity 측**:
+```csharp
+using Muabe.WebView;
+
+public class MyController : MonoBehaviour
+{
+    [SerializeField] private FlutterWebBridge bridge;
+    
+    public void OnButtonClick()
+    {
+        // Flutter 위젯 제어
+        bridge.HideWidget("lion");
+        bridge.ShowWidget("cloud");
+        bridge.ToggleWidgetVisibility("bird");
+    }
+}
+```
+
+**Flutter 측**:
+```dart
+import 'package:your_app/common/unity_bridge/unity_bridge.dart';
+
+class MyPage extends StatefulWidget {
+  @override
+  void initState() {
+    super.initState();
+    unityBridge.addVisibilityListener((widgetId, visible) {
+      print('Unity says: $widgetId should be ${visible ? "visible" : "hidden"}');
+    });
+  }
+}
+```
+
+## 🤝 기여
+
+기여를 환영합니다! 이슈나 풀 리퀘스트를 자유롭게 제출해주세요.
+
+## 📞 지원
+
+- **개발사**: Muabe Motion
+- **이메일**: dev@muabe.com
+- **웹사이트**: https://www.muabe.com/
+
+## 📄 라이선스
+
 이 패키지는 [Apache License 2.0](LICENSE) 하에 배포됩니다.
+
+---
+
+**Made with ❤️ by Muabe Motion**
