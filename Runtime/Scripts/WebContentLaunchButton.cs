@@ -318,12 +318,12 @@ namespace Muabe.WebView
             installer.SetContentRootSubfolder(contentRootSubfolder);
         }
 
-        if (targetServer != null)
+        if (targetServer != null && !string.IsNullOrWhiteSpace(routePrefix))
         {
             targetServer.SetRoutePrefix(routePrefix);
         }
 
-        if (targetWebView != null)
+        if (targetWebView != null && !string.IsNullOrWhiteSpace(routePrefix))
         {
             targetWebView.SetWebRootPath(BuildWebRootPath(routePrefix));
         }
