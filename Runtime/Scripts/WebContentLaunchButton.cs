@@ -48,10 +48,6 @@ namespace Muabe.WebView
     [SerializeField]
     private float serverReadyTimeout = 5f;
 
-    [Tooltip("웹뷰를 자동으로 보여줄지 여부")]
-    [SerializeField]
-    private bool showWebViewOnLoad = true;
-
     [Tooltip("이미 로드된 상태라면 버튼을 비활성화합니다.")]
     [SerializeField]
     private bool disableButtonAfterSuccess = false;
@@ -115,11 +111,19 @@ namespace Muabe.WebView
             if (installer == null)
             {
                 installer = GetComponentInParent<WebContentDownloadManager>();
+                if (installer == null)
+                {
+                    installer = WebViewUtility.FindObjectInScene<WebContentDownloadManager>(true);
+                }
             }
 
             if (targetServer == null)
             {
                 targetServer = GetComponentInParent<LocalWebServer>();
+                if (targetServer == null)
+                {
+                    targetServer = WebViewUtility.FindObjectInScene<LocalWebServer>(true);
+                }
             }
 
             if (targetWebView == null)
@@ -128,6 +132,40 @@ namespace Muabe.WebView
                 if (targetWebView == null)
                 {
                     targetWebView = GetComponentInChildren<WebViewController>(true);
+                }
+                if (targetWebView == null)
+                {
+                    targetWebView = WebViewUtility.FindObjectInScene<WebViewController>(true);
+                }
+            }
+
+            if (Application.isPlaying)
+            {
+                if (installer != null)
+                {
+                    WebViewUtility.Log(LogPrefix, $"Installer assigned: {installer.name}");
+                }
+                else
+                {
+                    WebViewUtility.LogWarning(LogPrefix, "Installer not found!");
+                }
+
+                if (targetServer != null)
+                {
+                    WebViewUtility.Log(LogPrefix, $"Server assigned: {targetServer.name}");
+                }
+                else
+                {
+                    WebViewUtility.LogWarning(LogPrefix, "Server not found!");
+                }
+
+                if (targetWebView != null)
+                {
+                    WebViewUtility.Log(LogPrefix, $"WebView assigned: {targetWebView.name}");
+                }
+                else
+                {
+                    WebViewUtility.LogError(LogPrefix, "WebView not found! Please add WebViewController to your scene or manually assign it.");
                 }
             }
 
@@ -207,26 +245,20 @@ namespace Muabe.WebView
             }
         }
 
-        if (targetWebView == null)
+        if (targetWebView != null)
         {
-            WebViewUtility.LogWarning(LogPrefix, "targetWebView is not assigned. Cannot load WebView.");
-            UpdateStatusLabel(failedLabel);
-            onLoadFailed?.Invoke();
-            SetButtonInteractable(true);
-            loadRoutine = null;
-            yield break;
+            WebViewUtility.Log(LogPrefix, "Loading initial WebView (hidden)");
+            targetWebView.LoadInitialUrl();
+        }
+        else
+        {
+            WebViewUtility.LogWarning(LogPrefix, "targetWebView is not assigned. Skipping WebView load.");
         }
 
-        targetWebView.LoadInitialUrl();
-        if (showWebViewOnLoad)
-        {
-            targetWebView.SetVisible(true);
-        }
-
-            UpdateStatusLabel(completedLabel);
-            onLoadCompleted?.Invoke();
-            wasSuccessful = true;
-            SetButtonInteractable(!disableButtonAfterSuccess);
+        UpdateStatusLabel(completedLabel);
+        onLoadCompleted?.Invoke();
+        wasSuccessful = true;
+        SetButtonInteractable(!disableButtonAfterSuccess);
         loadRoutine = null;
     }
 
@@ -325,13 +357,8 @@ namespace Muabe.WebView
 
         if (targetWebView != null && !string.IsNullOrWhiteSpace(routePrefix))
         {
-            targetWebView.SetWebRootPath(BuildWebRootPath(routePrefix));
+            targetWebView.SetWebRootPath(WebViewUtility.BuildWebRootPath(routePrefix));
         }
     }
-
-        private string BuildWebRootPath(string route)
-        {
-            return WebViewUtility.BuildWebRootPath(route);
-        }
     }
 }

@@ -133,6 +133,7 @@ namespace Muabe.WebView
         installer.onInstallStarted.AddListener(HandleInstallStarted);
         installer.onInstallCompleted.AddListener(HandleInstallCompleted);
         installer.onInstallFailed.AddListener(HandleInstallFailed);
+        installer.onDownloadProgress.AddListener(HandleDownloadProgress);
         eventsSubscribed = true;
     }
 
@@ -146,6 +147,7 @@ namespace Muabe.WebView
         installer.onInstallStarted.RemoveListener(HandleInstallStarted);
         installer.onInstallCompleted.RemoveListener(HandleInstallCompleted);
         installer.onInstallFailed.RemoveListener(HandleInstallFailed);
+        installer.onDownloadProgress.RemoveListener(HandleDownloadProgress);
         eventsSubscribed = false;
     }
 
@@ -199,6 +201,15 @@ namespace Muabe.WebView
             UpdateStatusLabel(downloadingLabel);
         }
         Debug.Log($"{LogPrefix} Install started");
+    }
+
+    private void HandleDownloadProgress(float progress)
+    {
+        if (!usingCachedContent)
+        {
+            int percentage = Mathf.RoundToInt(progress * 100f);
+            UpdateStatusLabel($"{downloadingLabel} {percentage}%");
+        }
     }
 
         private void HandleInstallCompleted()

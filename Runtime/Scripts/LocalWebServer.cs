@@ -67,8 +67,12 @@ namespace Muabe.WebView
         private string contentRootOverride;
         private string cachedContentRootFullPath;
         private string routePrefix = string.Empty;
+        private bool isServerReady;
         
         public bool IsRunning => isRunning;
+        public bool IsServerReady => isServerReady;
+        
+        public event System.Action OnServerReady;
 
     private void Awake()
     {
@@ -175,6 +179,16 @@ namespace Muabe.WebView
         listenerThread = new Thread(Listen) { IsBackground = true };
         listenerThread.Start();
         Debug.Log($"{LogPrefix} Local web server starting on http://localhost:{port}");
+        
+        StartCoroutine(NotifyServerReady());
+    }
+    
+    private IEnumerator NotifyServerReady()
+    {
+        yield return new WaitForSeconds(0.5f);
+        isServerReady = true;
+        OnServerReady?.Invoke();
+        Debug.Log($"{LogPrefix} Server ready notification sent");
     }
 
     public void StopServer()
@@ -185,6 +199,7 @@ namespace Muabe.WebView
         }
 
         isRunning = false;
+        isServerReady = false;
 
         if (tcpListener != null)
         {
@@ -204,7 +219,7 @@ namespace Muabe.WebView
         {
             isRunning = true;
             tcpListener = new TcpListener(IPAddress.Loopback, port);
-            tcpListener.Start();
+            tcpListener.Start(10); // 백로그 큐 크기 제한 (동시 연결 대기 수)
 
             while (isRunning)
             {
@@ -239,6 +254,10 @@ namespace Muabe.WebView
     {
         try
         {
+            // 타임아웃 설정 (읽기/쓰기 각 5초)
+            client.ReceiveTimeout = 5000;
+            client.SendTimeout = 5000;
+
             using NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[4096];
             int bytesRead = stream.Read(buffer, 0, buffer.Length);
@@ -273,13 +292,28 @@ namespace Muabe.WebView
                 ProcessGetRequest(stream, url);
             }
         }
+        catch (System.IO.IOException ioEx)
+        {
+            // 네트워크 I/O 에러는 경고로만 처리 (클라이언트가 연결을 끊은 경우 등)
+            if (logRequests)
+            {
+                Debug.LogWarning($"{LogPrefix} Network I/O error: {ioEx.Message}");
+            }
+        }
         catch (Exception e)
         {
             Debug.LogError($"{LogPrefix} Error handling client: {e.Message}");
         }
         finally
         {
-            client.Close();
+            try
+            {
+                client.Close();
+            }
+            catch
+            {
+                // 이미 닫힌 연결은 무시
+            }
         }
     }
 
@@ -713,26 +747,59 @@ namespace Muabe.WebView
 
     private void WriteResponse(NetworkStream stream, int statusCode, string contentType, byte[] payload)
     {
-        string statusText = statusCode switch
+        if (!stream.CanWrite)
         {
-            200 => "OK",
-            404 => "Not Found",
-            500 => "Internal Server Error",
-            503 => "Service Unavailable",
-            _ => "OK"
-        };
+            Debug.LogWarning($"{LogPrefix} Cannot write to stream (stream closed or not writable)");
+            return;
+        }
 
-        string header = $"HTTP/1.1 {statusCode} {statusText}\r\n" +
-                        $"Content-Type: {contentType}\r\n" +
-                        $"Content-Length: {payload.Length}\r\n" +
-                        "Access-Control-Allow-Origin: *\r\n" +
-                        "Connection: close\r\n\r\n";
-
-        byte[] headerBytes = Encoding.UTF8.GetBytes(header);
-        stream.Write(headerBytes, 0, headerBytes.Length);
-        if (payload.Length > 0)
+        try
         {
-            stream.Write(payload, 0, payload.Length);
+            string statusText = statusCode switch
+            {
+                200 => "OK",
+                404 => "Not Found",
+                500 => "Internal Server Error",
+                503 => "Service Unavailable",
+                _ => "OK"
+            };
+
+            string header = $"HTTP/1.1 {statusCode} {statusText}\r\n" +
+                            $"Content-Type: {contentType}\r\n" +
+                            $"Content-Length: {payload.Length}\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Connection: close\r\n\r\n";
+
+            byte[] headerBytes = Encoding.UTF8.GetBytes(header);
+            stream.Write(headerBytes, 0, headerBytes.Length);
+            
+            if (payload.Length > 0)
+            {
+                // 큰 파일은 청크로 나눠서 전송
+                const int chunkSize = 8192; // 8KB 청크
+                int offset = 0;
+                
+                while (offset < payload.Length)
+                {
+                    int bytesToWrite = Math.Min(chunkSize, payload.Length - offset);
+                    stream.Write(payload, offset, bytesToWrite);
+                    offset += bytesToWrite;
+                }
+            }
+
+            stream.Flush();
+        }
+        catch (System.IO.IOException ioEx)
+        {
+            // 클라이언트가 연결을 끊은 경우 등의 I/O 에러
+            if (logRequests)
+            {
+                Debug.LogWarning($"{LogPrefix} Failed to write response: {ioEx.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"{LogPrefix} Unexpected error writing response: {ex.Message}");
         }
     }
 

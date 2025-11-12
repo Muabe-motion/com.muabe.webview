@@ -23,6 +23,7 @@
 
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <AVFoundation/AVFoundation.h>
 
 // NOTE: we need extern without "C" before unity 4.5
 //extern UIViewController *UnityGetGLViewController();
@@ -212,6 +213,29 @@ window.Unity = { \
                 configuration.mediaPlaybackRequiresUserAction = NO;
             }
         }
+        
+        // AVAudioSession 설정 - 비디오와 오디오가 함께 재생되도록 설정
+        NSError *audioSessionError = nil;
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        
+        // Ambient + MixWithOthers + DuckOthers 옵션 사용
+        // Ambient: 다른 앱의 오디오와도 믹스 가능
+        // MixWithOthers: 여러 오디오 소스 동시 재생
+        // DuckOthers: 중요한 오디오 재생 시 다른 오디오 볼륨 낮춤 (사용 안 함)
+        [audioSession setCategory:AVAudioSessionCategoryAmbient
+                      withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                            error:&audioSessionError];
+        if (audioSessionError) {
+            NSLog(@"[WebView] Failed to set audio session category: %@", audioSessionError);
+        } else {
+            [audioSession setActive:YES error:&audioSessionError];
+            if (audioSessionError) {
+                NSLog(@"[WebView] Failed to activate audio session: %@", audioSessionError);
+            } else {
+                NSLog(@"[WebView] AVAudioSession configured: Ambient + MixWithOthers");
+            }
+        }
+        
         configuration.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
         configuration.processPool = _sharedProcessPool;
         if (@available(iOS 13.0, *)) {
@@ -797,6 +821,21 @@ window.Unity = { \
     if (webView == nil)
         return;
     webView.hidden = visibility ? NO : YES;
+    
+    // WebView가 보일 때 AVAudioSession 재설정 (Unity가 덮어쓸 수 있으므로)
+    if (visibility) {
+        NSError *audioSessionError = nil;
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+        [audioSession setCategory:AVAudioSessionCategoryAmbient
+                      withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                            error:&audioSessionError];
+        if (!audioSessionError) {
+            [audioSession setActive:YES error:&audioSessionError];
+            if (!audioSessionError) {
+                NSLog(@"[WebView] AVAudioSession re-configured: Ambient + MixWithOthers");
+            }
+        }
+    }
 }
 
 - (void)setInteractionEnabled:(BOOL)enabled
@@ -1023,6 +1062,7 @@ extern "C" {
     BOOL _CWebViewPlugin_IsInitialized(void *instance);
     void *_CWebViewPlugin_Init(const char *gameObjectName, BOOL transparent, BOOL zoom, const char *ua, BOOL enableWKWebView, int contentMode, BOOL allowsLinkPreview, BOOL allowsBackForwardNavigationGestures, int radius);
     void _CWebViewPlugin_Destroy(void *instance);
+    void _ResetAudioSession();
     void _CWebViewPlugin_SetMargins(
         void *instance, float left, float top, float right, float bottom, BOOL relative);
     void _CWebViewPlugin_SetVisibility(void *instance, BOOL visibility);
@@ -1306,4 +1346,30 @@ void _CWebViewPlugin_SetSuspended(void *instance, BOOL suspended)
     CWebViewPlugin *webViewPlugin = (__bridge CWebViewPlugin *)instance;
     [webViewPlugin setAllMediaPlaybackSuspended:suspended];
 }
+
+void _ResetAudioSession()
+{
+    NSError *audioSessionError = nil;
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    
+    // Ambient 카테고리로 설정 - 여러 오디오 소스 동시 재생 허용
+    [audioSession setCategory:AVAudioSessionCategoryAmbient
+                  withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                        error:&audioSessionError];
+    
+    if (audioSessionError) {
+        NSLog(@"[WebView] _ResetAudioSession: Failed to set category: %@", audioSessionError);
+        return;
+    }
+    
+    // 즉시 활성화
+    [audioSession setActive:YES error:&audioSessionError];
+    
+    if (audioSessionError) {
+        NSLog(@"[WebView] _ResetAudioSession: Failed to activate: %@", audioSessionError);
+    } else {
+        NSLog(@"[WebView] _ResetAudioSession: Successfully reset to Ambient+MixWithOthers");
+    }
+}
+
 #endif // !(__IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_9_0)

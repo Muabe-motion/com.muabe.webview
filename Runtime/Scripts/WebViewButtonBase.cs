@@ -22,10 +22,23 @@ namespace Muabe.WebView
 
         protected virtual void Awake()
         {
+            Debug.Log($"[WebViewButtonBase] Awake called for {gameObject.name}");
+            
             button = GetComponent<Button>();
+            if (button == null)
+            {
+                Debug.LogError($"[WebViewButtonBase] Button component not found on {gameObject.name}! Please add a Button component.");
+                // button이 없어도 나머지는 초기화
+            }
+            else
+            {
+                Debug.Log($"[WebViewButtonBase] Button component found on {gameObject.name}");
+                button.onClick.AddListener(OnButtonClicked);
+                Debug.Log($"[WebViewButtonBase] onClick listener added for {gameObject.name}");
+            }
+            
             AutoAssignUIReferences();
             CacheOriginalLabels();
-            button.onClick.AddListener(OnButtonClicked);
         }
 
         protected virtual void OnDestroy()
