@@ -136,7 +136,8 @@ namespace Muabe.WebView
                 FlushPendingJavaScript();
             },
             enableWKWebView: enableWKWebView,
-            transparent: transparent
+            transparent: transparent,
+            wkAllowsBackForwardNavigationGestures: false  // swipe back 제스처 비활성화
         );
 
         yield return null;
