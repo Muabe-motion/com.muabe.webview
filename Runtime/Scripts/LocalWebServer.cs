@@ -258,38 +258,40 @@ namespace Muabe.WebView
             client.ReceiveTimeout = 5000;
             client.SendTimeout = 5000;
 
-            using NetworkStream stream = client.GetStream();
-            byte[] buffer = new byte[4096];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            if (bytesRead <= 0)
+            using (NetworkStream stream = client.GetStream())
             {
-                return;
-            }
+                byte[] buffer = new byte[4096];
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead <= 0)
+                {
+                    return;
+                }
 
-            string request = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            string[] requestLines = request.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            if (requestLines.Length == 0)
-            {
-                return;
-            }
+                string request = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                string[] requestLines = request.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                if (requestLines.Length == 0)
+                {
+                    return;
+                }
 
-            string[] requestParts = requestLines[0].Split(' ');
-            if (requestParts.Length < 2)
-            {
-                return;
-            }
+                string[] requestParts = requestLines[0].Split(' ');
+                if (requestParts.Length < 2)
+                {
+                    return;
+                }
 
-            string method = requestParts[0];
-            string url = requestParts[1];
+                string method = requestParts[0];
+                string url = requestParts[1];
 
-            if (logRequests)
-            {
-                Debug.Log($"{LogPrefix} {method} {url}");
-            }
+                if (logRequests)
+                {
+                    Debug.Log($"{LogPrefix} {method} {url}");
+                }
 
-            if (method == "GET")
-            {
-                ProcessGetRequest(stream, url);
+                if (method == "GET")
+                {
+                    ProcessGetRequest(stream, url);
+                }
             }
         }
         catch (System.IO.IOException ioEx)
@@ -432,18 +434,20 @@ namespace Muabe.WebView
                 if (!string.IsNullOrEmpty(listRelative))
                 {
                     string listUri = CombineUri(baseUri, listRelative);
-                    using UnityWebRequest listRequest = UnityWebRequest.Get(listUri);
-                    yield return listRequest.SendWebRequest();
+                    using (UnityWebRequest listRequest = UnityWebRequest.Get(listUri))
+                    {
+                        yield return listRequest.SendWebRequest();
 
-                    if (listRequest.result == UnityWebRequest.Result.Success)
-                    {
-                        ParsePreloadList(listRequest.downloadHandler.text, filesToPreload);
-                        listFromFile = filesToPreload.Count > 0;
-                        Debug.Log($"{LogPrefix} Loaded {filesToPreload.Count} preload entries from {listUri}");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"{LogPrefix} Failed to load preload list {listUri}: {listRequest.error}");
+                        if (!listRequest.isNetworkError && !listRequest.isHttpError)
+                        {
+                            ParsePreloadList(listRequest.downloadHandler.text, filesToPreload);
+                            listFromFile = filesToPreload.Count > 0;
+                            Debug.Log($"{LogPrefix} Loaded {filesToPreload.Count} preload entries from {listUri}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"{LogPrefix} Failed to load preload list {listUri}: {listRequest.error}");
+                        }
                     }
                 }
             }
@@ -484,19 +488,21 @@ namespace Muabe.WebView
             string requestKey = BuildCacheKey(route, relative);
             string fileUri = CombineUri(baseUri, relative);
 
-            using UnityWebRequest request = UnityWebRequest.Get(fileUri);
-            yield return request.SendWebRequest();
+            using (UnityWebRequest request = UnityWebRequest.Get(fileUri))
+            {
+                yield return request.SendWebRequest();
 
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                lock (AndroidCacheLock)
+                if (!request.isNetworkError && !request.isHttpError)
                 {
-                    AndroidStreamingCache[requestKey] = request.downloadHandler.data;
+                    lock (AndroidCacheLock)
+                    {
+                        AndroidStreamingCache[requestKey] = request.downloadHandler.data;
+                    }
                 }
-            }
-            else
-            {
-                Debug.LogError($"{LogPrefix} Failed to preload {fileUri}: {request.error}");
+                else
+                {
+                    Debug.LogError($"{LogPrefix} Failed to preload {fileUri}: {request.error}");
+                }
             }
         }
 
@@ -755,14 +761,25 @@ namespace Muabe.WebView
 
         try
         {
-            string statusText = statusCode switch
+            string statusText;
+            switch (statusCode)
             {
-                200 => "OK",
-                404 => "Not Found",
-                500 => "Internal Server Error",
-                503 => "Service Unavailable",
-                _ => "OK"
-            };
+                case 200:
+                    statusText = "OK";
+                    break;
+                case 404:
+                    statusText = "Not Found";
+                    break;
+                case 500:
+                    statusText = "Internal Server Error";
+                    break;
+                case 503:
+                    statusText = "Service Unavailable";
+                    break;
+                default:
+                    statusText = "OK";
+                    break;
+            }
 
             string header = $"HTTP/1.1 {statusCode} {statusText}\r\n" +
                             $"Content-Type: {contentType}\r\n" +
@@ -806,24 +823,38 @@ namespace Muabe.WebView
     private string GetContentType(string filePath)
     {
         string extension = Path.GetExtension(filePath).ToLowerInvariant();
-        return extension switch
+        switch (extension)
         {
-            ".html" => "text/html; charset=utf-8",
-            ".js" => "application/javascript; charset=utf-8",
-            ".css" => "text/css; charset=utf-8",
-            ".json" => "application/json; charset=utf-8",
-            ".png" => "image/png",
-            ".jpg" => "image/jpeg",
-            ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".svg" => "image/svg+xml",
-            ".ico" => "image/x-icon",
-            ".wasm" => "application/wasm",
-            ".woff" => "font/woff",
-            ".woff2" => "font/woff2",
-            ".ttf" => "font/ttf",
-            _ => "application/octet-stream"
-        };
+            case ".html":
+                return "text/html; charset=utf-8";
+            case ".js":
+                return "application/javascript; charset=utf-8";
+            case ".css":
+                return "text/css; charset=utf-8";
+            case ".json":
+                return "application/json; charset=utf-8";
+            case ".png":
+                return "image/png";
+            case ".jpg":
+            case ".jpeg":
+                return "image/jpeg";
+            case ".gif":
+                return "image/gif";
+            case ".svg":
+                return "image/svg+xml";
+            case ".ico":
+                return "image/x-icon";
+            case ".wasm":
+                return "application/wasm";
+            case ".woff":
+                return "font/woff";
+            case ".woff2":
+                return "font/woff2";
+            case ".ttf":
+                return "font/ttf";
+            default:
+                return "application/octet-stream";
+        }
     }
 
     private void OnDestroy()

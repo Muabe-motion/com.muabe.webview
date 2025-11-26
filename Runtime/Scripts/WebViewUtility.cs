@@ -99,24 +99,38 @@ namespace Muabe.WebView
         public static string GetContentType(string filePath)
         {
             string extension = Path.GetExtension(filePath).ToLowerInvariant();
-            return extension switch
+            switch (extension)
             {
-                ".html" => "text/html; charset=utf-8",
-                ".js" => "application/javascript; charset=utf-8",
-                ".css" => "text/css; charset=utf-8",
-                ".json" => "application/json; charset=utf-8",
-                ".png" => "image/png",
-                ".jpg" => "image/jpeg",
-                ".jpeg" => "image/jpeg",
-                ".gif" => "image/gif",
-                ".svg" => "image/svg+xml",
-                ".ico" => "image/x-icon",
-                ".wasm" => "application/wasm",
-                ".woff" => "font/woff",
-                ".woff2" => "font/woff2",
-                ".ttf" => "font/ttf",
-                _ => "application/octet-stream"
-            };
+                case ".html":
+                    return "text/html; charset=utf-8";
+                case ".js":
+                    return "application/javascript; charset=utf-8";
+                case ".css":
+                    return "text/css; charset=utf-8";
+                case ".json":
+                    return "application/json; charset=utf-8";
+                case ".png":
+                    return "image/png";
+                case ".jpg":
+                case ".jpeg":
+                    return "image/jpeg";
+                case ".gif":
+                    return "image/gif";
+                case ".svg":
+                    return "image/svg+xml";
+                case ".ico":
+                    return "image/x-icon";
+                case ".wasm":
+                    return "application/wasm";
+                case ".woff":
+                    return "font/woff";
+                case ".woff2":
+                    return "font/woff2";
+                case ".ttf":
+                    return "font/ttf";
+                default:
+                    return "application/octet-stream";
+            }
         }
 
         /// <summary>
@@ -124,14 +138,19 @@ namespace Muabe.WebView
         /// </summary>
         public static string GetHttpStatusText(int statusCode)
         {
-            return statusCode switch
+            switch (statusCode)
             {
-                WebViewConstants.HttpStatusOk => "OK",
-                WebViewConstants.HttpStatusNotFound => "Not Found",
-                WebViewConstants.HttpStatusInternalError => "Internal Server Error",
-                WebViewConstants.HttpStatusServiceUnavailable => "Service Unavailable",
-                _ => "OK"
-            };
+                case WebViewConstants.HttpStatusOk:
+                    return "OK";
+                case WebViewConstants.HttpStatusNotFound:
+                    return "Not Found";
+                case WebViewConstants.HttpStatusInternalError:
+                    return "Internal Server Error";
+                case WebViewConstants.HttpStatusServiceUnavailable:
+                    return "Service Unavailable";
+                default:
+                    return "OK";
+            }
         }
 
         /// <summary>

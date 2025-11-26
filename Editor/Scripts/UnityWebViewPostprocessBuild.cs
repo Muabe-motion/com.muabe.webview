@@ -10,13 +10,14 @@ using System;
 using UnityEditor.Android;
 #if UNITY_2018_1_OR_NEWER
 using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 #endif
 using UnityEditor.Callbacks;
 using UnityEditor;
 using UnityEngine;
 
 #if UNITY_2018_1_OR_NEWER
-public class UnityWebViewPostprocessBuild : IPreprocessBuild, IPostGenerateGradleAndroidProject
+public class UnityWebViewPostprocessBuild : IPreprocessBuildWithReport, IPostGenerateGradleAndroidProject
 #else
 public class UnityWebViewPostprocessBuild
 #endif
@@ -28,8 +29,8 @@ public class UnityWebViewPostprocessBuild
     //// cf. https://github.com/Over17/UnityAndroidManifestCallback
 
 #if UNITY_2018_1_OR_NEWER
-    public void OnPreprocessBuild(BuildTarget buildTarget, string path) {
-        if (buildTarget == BuildTarget.Android) {
+    public void OnPreprocessBuild(BuildReport report) {
+        if (report.summary.platform == BuildTarget.Android) {
             var dev = "Packages/com.muabe.webview/Runtime/Plugins/Android/WebViewPlugin-development.aar.tmpl";
             var rel = "Packages/com.muabe.webview/Runtime/Plugins/Android/WebViewPlugin-release.aar.tmpl";
             if (!File.Exists(dev) || !File.Exists(rel)) {
@@ -274,6 +275,15 @@ public class UnityWebViewPostprocessBuild
                 var method = type.GetMethod("AddBuildProperty", new Type[]{typeof(string), typeof(string), typeof(string)});
                 method.Invoke(proj, new object[]{target, "OTHER_CFLAGS", cflags});
             }
+            
+            // Remove -mno-thumb flag for ARM64 compatibility (Unity 2019.4 + iOS 13+)
+            {
+                var method = type.GetMethod("UpdateBuildProperty", new Type[]{typeof(string), typeof(string), typeof(string[]), typeof(string[])});
+                if (method != null) {
+                    method.Invoke(proj, new object[]{target, "OTHER_CFLAGS", null, new string[]{"-mno-thumb"}});
+                }
+            }
+            
             var dst = "";
             //dst = proj.WriteToString();
             {

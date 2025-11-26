@@ -256,30 +256,34 @@ namespace Muabe.WebView
             onInstallStarted?.Invoke();
             Debug.Log($"{LogPrefix} Downloading from {resolvedUrl}");
 
-            using UnityWebRequest request = UnityWebRequest.Get(resolvedUrl);
-            var operation = request.SendWebRequest();
-
-            // 다운로드 진행률 업데이트
-            while (!operation.isDone)
+            byte[] data;
+            using (UnityWebRequest request = UnityWebRequest.Get(resolvedUrl))
             {
-                float progress = request.downloadProgress;
-                onDownloadProgress?.Invoke(progress);
-                yield return null;
+                var operation = request.SendWebRequest();
+
+                // 다운로드 진행률 업데이트
+                while (!operation.isDone)
+                {
+                    float progress = request.downloadProgress;
+                    onDownloadProgress?.Invoke(progress);
+                    yield return null;
+                }
+
+                // 완료 시 100%
+                onDownloadProgress?.Invoke(1f);
+
+                if (request.isNetworkError || request.isHttpError)
+                {
+                    Debug.LogError($"{LogPrefix} Download failed: {request.error}");
+                    onInstallFailed?.Invoke();
+                    installRoutine = null;
+                    activeDownloadUrl = null;
+                    yield break;
+                }
+
+                data = request.downloadHandler.data;
             }
 
-            // 완료 시 100%
-            onDownloadProgress?.Invoke(1f);
-
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError($"{LogPrefix} Download failed: {request.error}");
-                onInstallFailed?.Invoke();
-                installRoutine = null;
-                activeDownloadUrl = null;
-                yield break;
-            }
-
-            byte[] data = request.downloadHandler.data;
             if (data == null || data.Length == 0)
             {
                 Debug.LogError($"{LogPrefix} Download returned empty data.");
@@ -329,38 +333,41 @@ namespace Muabe.WebView
 
             Directory.CreateDirectory(installPath);
 
-            using MemoryStream memoryStream = new MemoryStream(zipData);
-            using ZipArchive archive = new ZipArchive(memoryStream, ZipArchiveMode.Read);
-
-            foreach (ZipArchiveEntry entry in archive.Entries)
+            using (MemoryStream memoryStream = new MemoryStream(zipData))
+            using (ZipArchive archive = new ZipArchive(memoryStream, ZipArchiveMode.Read))
             {
-                string destinationPath = Path.Combine(installPath, entry.FullName);
-                string fullDestinationPath = Path.GetFullPath(destinationPath);
-                string installRoot = Path.GetFullPath(installPath);
-
-                if (!fullDestinationPath.StartsWith(installRoot, StringComparison.Ordinal))
+                foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-                    Debug.LogWarning($"{LogPrefix} Skipping entry outside target directory: {entry.FullName}");
-                    continue;
-                }
+                    string destinationPath = Path.Combine(installPath, entry.FullName);
+                    string fullDestinationPath = Path.GetFullPath(destinationPath);
+                    string installRoot = Path.GetFullPath(installPath);
 
-                if (string.IsNullOrEmpty(entry.Name))
-                {
-                    Directory.CreateDirectory(fullDestinationPath);
-                    continue;
-                }
+                    if (!fullDestinationPath.StartsWith(installRoot, StringComparison.Ordinal))
+                    {
+                        Debug.LogWarning($"{LogPrefix} Skipping entry outside target directory: {entry.FullName}");
+                        continue;
+                    }
 
-                string directory = Path.GetDirectoryName(fullDestinationPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
+                    if (string.IsNullOrEmpty(entry.Name))
+                    {
+                        Directory.CreateDirectory(fullDestinationPath);
+                        continue;
+                    }
 
-                using Stream entryStream = entry.Open();
-                using FileStream fileStream = File.Create(fullDestinationPath);
-                entryStream.CopyTo(fileStream);
+                    string directory = Path.GetDirectoryName(fullDestinationPath);
+                    if (!string.IsNullOrEmpty(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    using (Stream entryStream = entry.Open())
+                    using (FileStream fileStream = File.Create(fullDestinationPath))
+                    {
+                        entryStream.CopyTo(fileStream);
+                    }
+                }
+                Debug.Log($"{LogPrefix} Extracted {archive.Entries.Count} entries.");
             }
-            Debug.Log($"{LogPrefix} Extracted {archive.Entries.Count} entries.");
         }
     }
 }
