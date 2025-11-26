@@ -43,6 +43,11 @@ public class UnityWebViewPostprocessBuild
             Directory.CreateDirectory("Assets/Plugins/Android");
             File.Copy(src, "Assets/Plugins/Android/WebViewPlugin.aar", true);
         }
+        
+        // iOS: Log warning about -mno-thumb flag (will be removed in PostProcessBuild)
+        if (report.summary.platform == BuildTarget.iOS) {
+            Debug.Log("unitywebview: iOS build detected. -mno-thumb flag will be automatically removed for ARM64 compatibility.");
+        }
     }
 
     public void OnPostGenerateGradleAndroidProject(string basePath) {
@@ -276,20 +281,25 @@ public class UnityWebViewPostprocessBuild
                 method.Invoke(proj, new object[]{target, "OTHER_CFLAGS", cflags});
             }
             
-            // Remove -mno-thumb flag for ARM64 compatibility (Unity 2019.4 + iOS 13+)
-            {
-                var method = type.GetMethod("UpdateBuildProperty", new Type[]{typeof(string), typeof(string), typeof(string[]), typeof(string[])});
-                if (method != null) {
-                    method.Invoke(proj, new object[]{target, "OTHER_CFLAGS", null, new string[]{"-mno-thumb"}});
-                }
-            }
-            
             var dst = "";
             //dst = proj.WriteToString();
             {
                 var method = type.GetMethod("WriteToString");
                 dst = (string)method.Invoke(proj, null);
             }
+            
+            // Remove -mno-thumb flag for ARM64 compatibility (Unity 2019.4 + iOS 13+)
+            // This flag is not supported on ARM64 and causes compilation errors
+            var originalDst = dst;
+            dst = Regex.Replace(dst, @"\s+-mno-thumb\s+", " ");
+            dst = Regex.Replace(dst, @"\s+-mno-thumb""", "\"");
+            dst = Regex.Replace(dst, @"""-mno-thumb\s+", "\"");
+            dst = Regex.Replace(dst, @"""-mno-thumb""", "\"\"");
+            
+            if (originalDst != dst) {
+                Debug.Log("unitywebview: Successfully removed -mno-thumb flag from Xcode project for ARM64 compatibility.");
+            }
+            
             File.WriteAllText(projPath, dst);
         }
     }
