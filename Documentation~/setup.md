@@ -25,7 +25,7 @@
    ```json
    {
      "dependencies": {
-       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.3"
+       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.6"
      }
    }
    ```
@@ -33,12 +33,12 @@
 2. **또는 Package Manager 사용**
    - Unity Editor에서 `Window > Package Manager` 열기
    - **+ > Add package from git URL...** 선택
-   - 입력: `https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.3`
+   - 입력: `https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.6`
    - **Add** 클릭
 
 3. **설치 확인**
    - Package Manager 목록에 **Muabe Interactive WebView** 표시
-   - 버전: 1.0.3
+   - 버전: 1.0.6
 
 ### 방법 2: 로컬 패키지로 설치
 

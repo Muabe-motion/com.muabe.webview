@@ -2,7 +2,7 @@
 
 [![Unity Version](https://img.shields.io/badge/Unity-2019.4%2B-blue)](https://unity.com/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.3-orange)](package.json)
+[![Version](https://img.shields.io/badge/version-1.0.6-orange)](package.json)
 
 Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹뷰, 로컬 웹 서버, 원격 콘텐츠 배포를 통합 구성할 수 있도록 도와줍니다. Flutter·React 등으로 제작한 웹 앱을 Android, iOS에서 동일한 워크플로로 배포하고, Unity와 웹 앱 간 양방향 통신을 지원합니다.
 
@@ -31,12 +31,12 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 ```json
 {
   "dependencies": {
-    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.3"
+    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.6"
   }
 }
 ```
 
-Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.3` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
+Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.6` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
 
 로컬 패키지로 쓰고 싶다면 이 저장소를 클론한 뒤 `Packages/com.muabe.webview` 경로를 선택해 `Add package from disk...`를 실행하면 됩니다.
 
