@@ -1,0 +1,14 @@
+<linker>
+  <!-- 
+    This file prevents Unity's IL2CPP code stripping from removing
+    System.IO.Compression types used by WebContentDownloadManager.
+    Required for Unity 2019.4+ IL2CPP builds (Android, iOS).
+  -->
+  <assembly fullname="System.IO.Compression" preserve="all"/>
+  <assembly fullname="System.IO.Compression.FileSystem" preserve="all"/>
+  
+  <!-- Preserve System.Core for Linq and other standard library features -->
+  <assembly fullname="System.Core">
+    <type fullname="System.Linq.Enumerable" preserve="all"/>
+  </assembly>
+</linker>

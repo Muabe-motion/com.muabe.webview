@@ -1,6 +1,6 @@
 # Muabe Interactive WebView
 
-[![Unity Version](https://img.shields.io/badge/Unity-2021.3%2B-blue)](https://unity.com/)
+[![Unity Version](https://img.shields.io/badge/Unity-2019.4%2B-blue)](https://unity.com/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.3-orange)](package.json)
 
@@ -19,9 +19,11 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 - 🎮 **UI 컴포넌트**: 드래그 앤 드롭으로 쉽게 구성 가능한 버튼들
 
 ### 지원 환경
-- Unity 2021.3 이상
+- Unity 2019.4 LTS 이상
 - 플랫폼: Android 7.0+, iOS 13+
 - 의존성: [unity-webview](https://github.com/gree/unity-webview) (패키지에 포함)
+
+> ⚠️ **Unity 2019.4 사용자**: IL2CPP 빌드 권장. [호환성 가이드](UNITY_2019_COMPATIBILITY.md) 참고
 
 ## GitHub에서 설치
 프로젝트의 `Packages/manifest.json`에 Git URL을 추가하면 바로 사용할 수 있습니다. 태그를 지정해 안정된 버전을 고정하는 것을 권장합니다.
@@ -188,6 +190,7 @@ Create Empty GameObject → 이름: "WebViewManager"
 ## 📚 문서
 
 - **[WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)** - 단계별 상세 설정 가이드 (1~5단계)
+- **[UNITY_2019_COMPATIBILITY.md](UNITY_2019_COMPATIBILITY.md)** - Unity 2019.4 호환성 가이드
 - **[README.md](README.md)** - 이 문서 (빠른 시작 및 개요)
 
 ## 🔧 코드 예시

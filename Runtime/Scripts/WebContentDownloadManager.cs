@@ -12,7 +12,8 @@ namespace Muabe.WebView
     {
         private const string LogPrefix = WebViewConstants.LogPrefixDownloadManager;
         [Header("다운로드 설정")]
-        [SerializeField, HideInInspector]
+        [SerializeField]
+        [HideInInspector]
         [Tooltip("원격에서 받을 ZIP 파일 URL (선택). 비워두면 DownloadContent 호출 시 전달된 URL을 사용합니다.")]
         private string defaultDownloadUrl = string.Empty;
 
@@ -20,10 +21,12 @@ namespace Muabe.WebView
         [Tooltip("다운로드한 콘텐츠를 저장할 하위 폴더 이름 (persistentDataPath 기준)")]
         private string installFolderName = "webview-content";
 
-        [SerializeField, HideInInspector]
+        [SerializeField]
+        [HideInInspector]
         private string contentRootSubfolder = "root";
 
-        [SerializeField, HideInInspector]
+        [SerializeField]
+        [HideInInspector]
         private string remoteVersion = string.Empty;
 
         [SerializeField]
