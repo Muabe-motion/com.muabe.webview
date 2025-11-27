@@ -8,7 +8,15 @@
 
 ### 필수 요구사항
 - **Unity**: 2019.4 LTS 이상
-- **플랫폼**: Android 7.0+, iOS 13+
+  - Unity 2019.4 사용 시 IL2CPP 빌드 권장 (상세: [UNITY_2019_COMPATIBILITY.md](../UNITY_2019_COMPATIBILITY.md))
+- **플랫폼**: Android 7.0+ (API Level 24), iOS 13+
+- **Android**: 
+  - Minimum API Level 24 이상
+  - Target API Level 30 이상 권장
+  - Scripting Backend: IL2CPP 권장 (ARM64 지원 필수)
+- **iOS**:
+  - Target minimum iOS Version 13.0 이상
+  - WKWebView 활성화 필수
 - **웹 앱**: Flutter, React, Vue 등으로 제작한 빌드 결과물
 - **배포 서버**: HTTPS 지원 서버 (GitHub Release, AWS S3, CDN 등)
 
@@ -16,6 +24,7 @@
 - Git 설치 (GitHub 패키지 사용 시)
 - 기본 Unity UI 지식
 - 웹 개발 경험 (Flutter/React 등)
+- .NET Standard 2.0 API Compatibility Level
 
 ## 📦 설치 방법
 
@@ -25,7 +34,7 @@
    ```json
    {
      "dependencies": {
-       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.6"
+       "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.8"
      }
    }
    ```
@@ -33,12 +42,12 @@
 2. **또는 Package Manager 사용**
    - Unity Editor에서 `Window > Package Manager` 열기
    - **+ > Add package from git URL...** 선택
-   - 입력: `https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.6`
+   - 입력: `https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.8`
    - **Add** 클릭
 
 3. **설치 확인**
    - Package Manager 목록에 **Muabe Interactive WebView** 표시
-   - 버전: 1.0.6
+   - 버전: 1.0.8
 
 ### 방법 2: 로컬 패키지로 설치
 
@@ -146,6 +155,9 @@ using Muabe.WebView;  // 모든 컴포넌트 접근
    **WebViewController**:
    - `Server Port`: 8082 (LocalWebServer와 동일)
    - `Auto Load On Start`: false (버튼으로 제어)
+   - `Enable WKWebView`: true (iOS 필수)
+   - `Transparent`: true (웹뷰 배경 투명)
+   - `Ignore Safe Area`: false (Safe Area 존중, true로 설정 시 전체 화면)
 
 4. **코드로 생성 (선택사항)**
    ```csharp
@@ -220,6 +232,10 @@ using Muabe.WebView;  // 모든 컴포넌트 접근
 - Inspector 설정:
   - `Request Microphone`: true (필요 시)
   - `Request Camera`: true (필요 시)
+
+> **💡 Unity 버전별 동작**:
+> - **Unity 2020.2+**: `PermissionCallbacks`를 사용한 상세한 권한 결과 처리 (승인/거부/다시 묻지 않음)
+> - **Unity 2019.4**: 기본 권한 요청 API 사용 (호환성 모드)
 
 ### Step 4: 테스트
 
@@ -349,32 +365,149 @@ aws s3 cp flutter-app.zip s3://your-bucket/flutter-app.zip --acl public-read
 > ✅ **버전만 바꾸면 자동으로 새 ZIP을 다운로드합니다!**
 
 ## 고급 설정 팁
+
+### 개발 및 디버깅
 - **캐시 초기화**: 개발 중 변경 사항을 바로 반영하려면 `WebContentDownloadButton`의 `remoteVersion` 값을 증가시키거나 `Force Download Every Time`을 켰다가 배포 시 끕니다.
-- **타임아웃 조정**: 대용량 ZIP을 다룰 때 `timeoutSeconds`, `maxRedirects`, `maxRetries`(필요 시 스크립트 확장) 값을 조정해 네트워크 안정성을 확보합니다.
+- **로그 활성화**: 
+  - `FlutterWebBridge`의 `Enable Debug Logs` 체크
+  - Console에서 `[WebView*]` 태그로 필터링
+- **Safe Area 테스트**: 다양한 디바이스에서 `Ignore Safe Area` 옵션 테스트
+
+### 성능 최적화
+- **타임아웃 조정**: 대용량 ZIP을 다룰 때 `timeoutSeconds`, `maxRedirects` 값을 조정해 네트워크 안정성을 확보합니다.
+- **StreamingAssets 프리로드**: Android에서 `android-preload.txt`로 자주 사용하는 리소스를 미리 패키징
+- **IL2CPP 빌드**: Unity 2019.4에서는 IL2CPP 사용 시 성능과 안정성 향상
+
+### 커스터마이징
 - **설치 위치 변경**: `installFolderName`을 환경별로 다르게 두고 싶다면 스크립트를 확장해 `Application.persistentDataPath` 하위 다른 경로를 사용할 수 있습니다.
 - **커스텀 이벤트**: 설치 완료, 실패, 서버 시작 등을 UnityEvent로 제공하므로 다른 로직과 연결해 후속 처리를 자동화하세요.
+- **Unity ↔ Web 통신 확장**: `FlutterWebBridge`를 확장하여 커스텀 메시지 타입 추가 가능
 
 ## 플랫폼별 체크리스트
-- **Android**
-  - `UNITYWEBVIEW_ANDROID_USES_CLEARTEXT_TRAFFIC` define이 자동 적용됩니다. HTTP를 사용할 경우 네트워크 보안 구성을 확인하세요.
-  - 필요한 권한(저장소, 카메라 등)을 `PermissionRequester`로 요청하거나 Android Manifest에 직접 추가합니다.
-  - 대용량 ZIP은 첫 실행에서 다운로드되므로 사용자 안내 UI를 준비하세요.
-- **iOS**
-  - `enableWKWebView`를 활성화해 최신 WKWebView를 사용합니다.
-  - HTTP를 이용한 콘텐츠 사용을 위해서는 `Edit > Project Settings > Player > iOS > Other Settings > Configuration` 섹션에서 **Allow downloads over HTTP** 값을 **Always allowed**로 설정하세요.
-  - 백그라운드 다운로드가 필요한 경우 `WebContentDownloadManager`를 확장하거나 네이티브 코루틴을 고려하세요.
+
+### Android
+- **필수 설정**:
+  - Minimum API Level: 24 이상
+  - Target API Level: 30 이상 권장
+  - Scripting Backend: IL2CPP (ARM64 지원 필수)
+  - Target Architectures: ARM64 체크 ✅
+- **권한 설정**:
+  - 필요한 권한(카메라, 마이크 등)을 `PermissionRequester`로 요청하거나 Android Manifest에 직접 추가
+  - `UNITYWEBVIEW_ANDROID_USES_CLEARTEXT_TRAFFIC` define이 자동 적용됨 (HTTP 사용 시)
+- **주의사항**:
+  - 대용량 ZIP은 첫 실행에서 다운로드되므로 사용자 안내 UI 준비 권장
+  - debug.keystore 손상 시 백업 후 재생성 필요
+  
+### iOS
+- **필수 설정**:
+  - Target minimum iOS Version: 13.0 이상
+  - `WebViewController`에서 `Enable WKWebView` 활성화 ✅
+- **HTTP 콘텐츠 사용 시**:
+  - `Edit > Project Settings > Player > iOS > Other Settings > Configuration`
+  - **Allow downloads over HTTP** → **Always allowed** 설정
+- **주의사항**:
+  - 백그라운드 다운로드가 필요한 경우 `WebContentDownloadManager` 확장 고려
+  - WKWebView는 iOS 13+ 필수
+
+### Unity 2019.4 LTS 사용자
+- **권장 설정**:
+  - Scripting Backend: IL2CPP
+  - API Compatibility Level: .NET Standard 2.0
+  - Managed Stripping Level: Low 또는 Medium
+- **주의사항**:
+  - `Runtime/link.xml`이 포함되어 System.IO.Compression 보존
+  - `PermissionRequester`는 Unity 버전별로 자동 최적화됨
+- **상세 가이드**: [UNITY_2019_COMPATIBILITY.md](../UNITY_2019_COMPATIBILITY.md) 참고
 
 ## 문제 해결
+
+### 일반 문제
 - **웹뷰가 빈 화면**: 콘솔에서 `LocalWebServer` 로그로 서버가 실행 중인지 확인하고, `WebViewController`가 올바른 포트와 라우트를 사용하고 있는지 검토하세요.
 - **ZIP 설치 실패**: ZIP 내부 폴더 구조가 `contentRootSubfolder`로 지정한 값과 일치하는지 확인하고, 압축이 깨지지 않았는지 다시 업로드합니다.
 - **HTTP 차단**: Android는 HTTP가 막힐 수 있으므로 HTTPS로 전환하거나 네트워크 보안 설정을 수정합니다. iOS는 ATS 정책을 확인하세요.
 - **캐시된 오래된 파일**: `WebContentDownloadButton`의 `remoteVersion` 값을 증가시키거나 퍼시스턴트 폴더에서 기존 설치 폴더를 삭제한 뒤 재실행합니다.
 - **권한 거부**: `PermissionRequester` 이벤트를 활용해 권한이 거부되었을 때 대체 UI를 표시합니다.
 
+### Android 빌드 문제
+
+#### "Invalid keystore format" 에러
+**증상**: 
+```
+Failed to read key AndroidDebugKey from store "/Users/[username]/.android/debug.keystore": Invalid keystore format
+```
+
+**해결 방법**:
+```bash
+# 손상된 debug.keystore 백업
+mv ~/.android/debug.keystore ~/.android/debug.keystore.backup
+
+# Unity에서 다시 빌드하면 새 keystore가 자동 생성됨
+```
+
+#### "You are trying to install ARMv7 APK to ARM64 device" 에러
+**증상**: ARM64 디바이스에 ARMv7 빌드 설치 실패
+
+**해결 방법**:
+1. `Edit > Project Settings > Player > Android > Other Settings`
+2. `Scripting Backend`: **IL2CPP**로 변경
+3. `Target Architectures`: **ARM64** 체크 ✅ (ARMv7은 선택사항)
+
+또는 `ProjectSettings/ProjectSettings.asset` 직접 수정:
+```yaml
+AndroidTargetArchitectures: 3  # ARMv7(1) + ARM64(2) = 3
+scriptingBackend:
+  Android: 1  # IL2CPP
+```
+
+#### "adb: device not found" 에러
+**해결 방법**:
+```bash
+# adb daemon 재시작
+adb kill-server
+adb start-server
+adb devices  # 디바이스 확인
+```
+
+### Safe Area 및 화면 표시 문제
+
+#### Safe Area 밖이 투명해서 Unity 화면이 보임
+**해결 방법 1 (권장)**: WebView를 전체 화면으로 확장
+- `WebViewController` Inspector에서 `Ignore Safe Area` ✅ 체크
+
+**해결 방법 2**: Unity 카메라 배경색 변경
+- Main Camera > Background 색상을 웹뷰 배경과 동일하게 설정
+
+**해결 방법 3**: UI로 Safe Area 밖 가리기
+- Canvas에 Panel 추가하여 Safe Area 밖 영역을 원하는 색으로 채움
+
+### Unity 2019.4 호환성 문제
+
+#### "Type or namespace 'PermissionCallbacks' could not be found" 컴파일 에러
+**원인**: Unity 2019.4에서 Unity 2020.2+ 전용 API 사용
+
+**해결 방법**: 
+- 패키지를 최신 버전(1.0.8+)으로 업데이트
+- 패키지에 Unity 버전별 조건부 컴파일이 적용되어 있음
+
+#### IL2CPP 빌드에서 "System.IO.Compression could not be found" 에러
+**해결 방법**:
+1. `Runtime/link.xml` 파일 존재 확인 (패키지에 포함됨)
+2. 여전히 문제 발생 시 `Assets/link.xml` 생성:
+```xml
+<linker>
+  <assembly fullname="System.IO.Compression" preserve="all"/>
+  <assembly fullname="System.IO.Compression.FileSystem" preserve="all"/>
+</linker>
+```
+
+> 📖 **상세 가이드**: Unity 2019.4 관련 자세한 내용은 [UNITY_2019_COMPATIBILITY.md](../UNITY_2019_COMPATIBILITY.md) 참고
+
 ## 📚 추가 자료
 
 - **[ARCHITECTURE.md](../ARCHITECTURE.md)**: 전체 아키텍처 및 컴포넌트 상세 설명
 - **[README.md](../README.md)**: 패키지 개요 및 빠른 시작
+- **[UNITY_2019_COMPATIBILITY.md](../UNITY_2019_COMPATIBILITY.md)**: Unity 2019.4 LTS 호환성 가이드
+- **[WEBVIEW_SETUP_GUIDE.md](../WEBVIEW_SETUP_GUIDE.md)**: 상세한 단계별 설정 가이드
 - **[LICENSE](../LICENSE)**: Apache License 2.0
 
 ## 💬 지원

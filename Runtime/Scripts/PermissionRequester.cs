@@ -44,6 +44,7 @@ namespace Muabe.WebView
                 yield break;
             }
 
+#if UNITY_2020_2_OR_NEWER
             bool completed = false;
             bool granted = false;
             bool dontAskAgain = false;
@@ -80,6 +81,20 @@ namespace Muabe.WebView
             {
                 WebViewUtility.Log(WebViewConstants.LogPrefixPermission, $"Permission granted: {permission}");
             }
+#else
+            Permission.RequestUserPermission(permission);
+            yield return new WaitForSeconds(0.5f);
+
+            bool granted = Permission.HasUserAuthorizedPermission(permission);
+            if (!granted)
+            {
+                WebViewUtility.LogWarning(WebViewConstants.LogPrefixPermission, $"Permission denied: {permission}");
+            }
+            else
+            {
+                WebViewUtility.Log(WebViewConstants.LogPrefixPermission, $"Permission granted: {permission}");
+            }
+#endif
         }
 #endif
     }
