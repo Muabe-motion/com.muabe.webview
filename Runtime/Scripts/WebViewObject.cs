@@ -592,6 +592,8 @@ public class WebViewObject : MonoBehaviour
     private static extern void _CWebViewPlugin_ClearCache(IntPtr instance, bool includeDiskFiles);
     [DllImport("__Internal")]
     private static extern void _CWebViewPlugin_SetSuspended(IntPtr instance, bool suspended);
+    [DllImport("__Internal")]
+    private static extern void _ResetAudioSession();
 #elif UNITY_WEBGL
     [DllImport("__Internal")]
     private static extern void _gree_unity_webview_init(string name);
@@ -1563,6 +1565,13 @@ public class WebViewObject : MonoBehaviour
         if (webView == null)
             return;
         webView.Call("SetMixedContentMode", mode);
+#endif
+    }
+
+    public static void ResetAudioSession()
+    {
+#if UNITY_IPHONE && !UNITY_EDITOR
+        _ResetAudioSession();
 #endif
     }
 

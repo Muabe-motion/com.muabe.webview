@@ -203,7 +203,9 @@ window.Unity = { \
             [controller addUserScript:script];
         }
         configuration.userContentController = controller;
-        configuration.allowsInlineMediaPlayback = true;
+
+        // 미디어 재생 설정 최적화
+        configuration.allowsInlineMediaPlayback = YES;
         if (@available(iOS 10.0, *)) {
             configuration.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
         } else {
@@ -213,27 +215,41 @@ window.Unity = { \
                 configuration.mediaPlaybackRequiresUserAction = NO;
             }
         }
-        
-        // AVAudioSession 설정 - 비디오와 오디오가 함께 재생되도록 설정
+
+        // iOS 15+ 미디어 캡처 최적화
+        if (@available(iOS 15.0, *)) {
+            // 미디어 재생을 위한 추가 설정
+            configuration.preferences.javaScriptEnabled = YES;
+        }
+
+        // AVAudioSession 설정 - 여러 오디오 소스 동시 재생 허용
         NSError *audioSessionError = nil;
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        
-        // Ambient + MixWithOthers + DuckOthers 옵션 사용
-        // Ambient: 다른 앱의 오디오와도 믹스 가능
-        // MixWithOthers: 여러 오디오 소스 동시 재생
-        // DuckOthers: 중요한 오디오 재생 시 다른 오디오 볼륨 낮춤 (사용 안 함)
-        [audioSession setCategory:AVAudioSessionCategoryAmbient
-                      withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                            error:&audioSessionError];
-        if (audioSessionError) {
-            NSLog(@"[WebView] Failed to set audio session category: %@", audioSessionError);
+
+        // Playback + MixWithOthers 옵션 사용
+        // - Playback: 오디오 재생 카테고리 (백그라운드 재생 가능)
+        // - MixWithOthers: 여러 오디오 소스 동시 재생 허용 (핵심!)
+        // 참고: DefaultToSpeaker는 PlayAndRecord 카테고리에서만 사용 가능
+        AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+        BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback
+                                      withOptions:options
+                                            error:&audioSessionError];
+
+        if (!success || audioSessionError) {
+            NSLog(@"[WebView] ⚠️  Failed to set audio session category: %@", audioSessionError);
+            // 실패해도 계속 진행 (Unity가 나중에 설정할 수도 있음)
+        }
+
+        // 오디오 세션 활성화 (에러 발생해도 계속 시도)
+        audioSessionError = nil;
+        success = [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+        if (success && !audioSessionError) {
+            NSLog(@"[WebView] ✓ AVAudioSession configured: Playback + MixWithOthers");
         } else {
-            [audioSession setActive:YES error:&audioSessionError];
-            if (audioSessionError) {
-                NSLog(@"[WebView] Failed to activate audio session: %@", audioSessionError);
-            } else {
-                NSLog(@"[WebView] AVAudioSession configured: Ambient + MixWithOthers");
-            }
+            NSLog(@"[WebView] ⚠️  Failed to activate audio session: %@", audioSessionError);
+            NSLog(@"[WebView]    This may be overridden by Unity later - will retry when WebView becomes visible");
         }
         
         configuration.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
@@ -300,12 +316,28 @@ window.Unity = { \
         = view.accessibilityElements ? [view.accessibilityElements mutableCopy] : [NSMutableArray array];
     [accessibilityElements addObject:(UIAccessibilityElement *)webView];
     view.accessibilityElements = accessibilityElements;
-    
+
+    // 앱이 포그라운드로 돌아올 때 AVAudioSession 재설정하도록 Notification 등록
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleAppDidBecomeActive:)
+                                                 name:UIApplicationDidBecomeActiveNotification
+                                               object:nil];
+
+    // 오디오 인터럽션 처리 (전화, 알람 등)
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleAudioSessionInterruption:)
+                                                 name:AVAudioSessionInterruptionNotification
+                                               object:nil];
+
     return self;
 }
 
 - (void)dispose
 {
+    // Notification 제거
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIApplicationDidBecomeActiveNotification object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVAudioSessionInterruptionNotification object:nil];
+
     if (webView != nil) {
         UIView <WebViewProtocol> *webView0 = webView;
         webView = nil;
@@ -318,7 +350,7 @@ window.Unity = { \
         [webView0 stopLoading];
         [webView0 removeFromSuperview];
         [webView0 removeObserver:self forKeyPath:@"loading"];
-        
+
         //remove the WebViewObject from Unity hierarchy tree
         UIView *view = UnityGetGLViewController().view;
         NSMutableArray<UIAccessibilityElement *> *accessibilityElements
@@ -333,6 +365,61 @@ window.Unity = { \
     allowRegex = nil;
     customRequestHeader = nil;
     gameObjectName = nil;
+}
+
+// 앱이 포그라운드로 돌아왔을 때 호출
+- (void)handleAppDidBecomeActive:(NSNotification *)notification
+{
+    NSLog(@"[WebView] App became active - resetting AVAudioSession");
+
+    NSError *audioSessionError = nil;
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+
+    AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+    BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback
+                                  withOptions:options
+                                        error:&audioSessionError];
+
+    if (success && !audioSessionError) {
+        audioSessionError = nil;
+        [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+        if (!audioSessionError) {
+            NSLog(@"[WebView] ✓ AVAudioSession reset on app becoming active");
+        }
+    }
+}
+
+// 오디오 인터럽션 처리 (전화, 알람 등)
+- (void)handleAudioSessionInterruption:(NSNotification *)notification
+{
+    NSNumber *interruptionType = notification.userInfo[AVAudioSessionInterruptionTypeKey];
+
+    if (interruptionType.unsignedIntegerValue == AVAudioSessionInterruptionTypeEnded) {
+        // 인터럽션 종료 후 오디오 세션 재활성화
+        NSLog(@"[WebView] Audio interruption ended - reactivating AVAudioSession");
+
+        NSError *audioSessionError = nil;
+        AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+
+        AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+        [audioSession setCategory:AVAudioSessionCategoryPlayback withOptions:options error:&audioSessionError];
+
+        if (!audioSessionError) {
+            NSNumber *interruptionOption = notification.userInfo[AVAudioSessionInterruptionOptionKey];
+            if (interruptionOption.unsignedIntegerValue == AVAudioSessionInterruptionOptionShouldResume) {
+                [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+                if (!audioSessionError) {
+                    NSLog(@"[WebView] ✓ AVAudioSession reactivated after interruption");
+                }
+            }
+        }
+    } else if (interruptionType.unsignedIntegerValue == AVAudioSessionInterruptionTypeBegan) {
+        NSLog(@"[WebView] Audio interruption began");
+    }
 }
 
 + (void)resetSharedProcessPool
@@ -586,6 +673,29 @@ window.Unity = { \
     UnitySendMessage([gameObjectName UTF8String], "CallOnError", [[error description] UTF8String]);
 }
 
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation
+{
+    // 페이지 로드 완료 후 AVAudioSession 재설정
+    // Unity가 중간에 오디오 세션을 변경했을 수 있으므로 다시 설정
+    NSError *audioSessionError = nil;
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+
+    AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+    BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback
+                                  withOptions:options
+                                        error:&audioSessionError];
+
+    if (success && !audioSessionError) {
+        audioSessionError = nil;
+        [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+        if (!audioSessionError) {
+            NSLog(@"[WebView] ✓ AVAudioSession re-configured after page load");
+        }
+    }
+}
+
 - (WKWebView *)webView:(WKWebView *)wkWebView createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration forNavigationAction:(WKNavigationAction *)navigationAction windowFeatures:(WKWindowFeatures *)windowFeatures
 {
     // cf. for target="_blank", cf. http://qiita.com/ShingoFukuyama/items/b3a1441025a36ab7659c
@@ -821,19 +931,31 @@ window.Unity = { \
     if (webView == nil)
         return;
     webView.hidden = visibility ? NO : YES;
-    
+
     // WebView가 보일 때 AVAudioSession 재설정 (Unity가 덮어쓸 수 있으므로)
     if (visibility) {
         NSError *audioSessionError = nil;
         AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-        [audioSession setCategory:AVAudioSessionCategoryAmbient
-                      withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                            error:&audioSessionError];
-        if (!audioSessionError) {
-            [audioSession setActive:YES error:&audioSessionError];
-            if (!audioSessionError) {
-                NSLog(@"[WebView] AVAudioSession re-configured: Ambient + MixWithOthers");
+
+        // MixWithOthers 옵션으로 설정
+        AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+        BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback
+                                      withOptions:options
+                                            error:&audioSessionError];
+
+        if (success && !audioSessionError) {
+            // 다른 오디오를 방해하지 않도록 NotifyOthersOnDeactivation 플래그 사용
+            audioSessionError = nil;
+            success = [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+            if (success && !audioSessionError) {
+                NSLog(@"[WebView] ✓ AVAudioSession re-configured on visibility: Playback + MixWithOthers");
+            } else {
+                NSLog(@"[WebView] ⚠️  Failed to activate audio session on visibility: %@", audioSessionError);
             }
+        } else {
+            NSLog(@"[WebView] ⚠️  Failed to set audio session category on visibility: %@", audioSessionError);
         }
     }
 }
@@ -1351,24 +1473,40 @@ void _ResetAudioSession()
 {
     NSError *audioSessionError = nil;
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    
-    // Ambient 카테고리로 설정 - 여러 오디오 소스 동시 재생 허용
-    [audioSession setCategory:AVAudioSessionCategoryAmbient
-                  withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                        error:&audioSessionError];
-    
-    if (audioSessionError) {
-        NSLog(@"[WebView] _ResetAudioSession: Failed to set category: %@", audioSessionError);
+
+    // 현재 오디오 세션 상태 로깅 (디버깅용)
+    NSString *currentCategory = audioSession.category;
+    AVAudioSessionCategoryOptions currentOptions = audioSession.categoryOptions;
+
+    // Playback + MixWithOthers 옵션으로 설정
+    // - Playback: 오디오 재생 카테고리 (백그라운드 재생 가능)
+    // - MixWithOthers: 여러 오디오 소스 동시 재생 허용 (핵심!)
+    // 참고: DefaultToSpeaker는 PlayAndRecord 카테고리에서만 사용 가능
+    AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers;
+
+    BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback
+                                  withOptions:options
+                                        error:&audioSessionError];
+
+    if (!success || audioSessionError) {
+        NSLog(@"[WebView] ⚠️  _ResetAudioSession: Failed to set category: %@", audioSessionError);
+        NSLog(@"[WebView]    Current category: %@, options: %lu", currentCategory, (unsigned long)currentOptions);
         return;
     }
-    
-    // 즉시 활성화
-    [audioSession setActive:YES error:&audioSessionError];
-    
-    if (audioSessionError) {
-        NSLog(@"[WebView] _ResetAudioSession: Failed to activate: %@", audioSessionError);
+
+    // 다른 오디오 앱을 방해하지 않도록 NotifyOthersOnDeactivation 플래그 사용
+    audioSessionError = nil;
+    success = [audioSession setActive:YES withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&audioSessionError];
+
+    if (!success || audioSessionError) {
+        NSLog(@"[WebView] ⚠️  _ResetAudioSession: Failed to activate: %@", audioSessionError);
     } else {
-        NSLog(@"[WebView] _ResetAudioSession: Successfully reset to Ambient+MixWithOthers");
+        NSLog(@"[WebView] ✓ _ResetAudioSession: Successfully reset");
+        NSLog(@"[WebView]   Category: Playback, Options: MixWithOthers");
+
+        // 현재 활성화된 오디오 세션 정보 로깅
+        NSLog(@"[WebView]   Current route: %@", audioSession.currentRoute);
+        NSLog(@"[WebView]   Output volume: %.2f", audioSession.outputVolume);
     }
 }
 
