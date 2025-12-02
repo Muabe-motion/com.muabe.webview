@@ -2,9 +2,11 @@
 
 ## 개요
 
-본 문서는 `com.muabe.webview` 패키지를 사용하여 Unity 프로젝트에서 웹 콘텐츠를 다운로드하고, 웹뷰를 실행하며, 영상을 로드하여 재생하는 전체 워크플로우를 설명합니다.
+본 문서는 `com.muabe.webview` 패키지를 사용하여 Unity 프로젝트에서 웹 콘텐츠를 다운로드하고, 웹뷰를 실행하며, 콘텐츠를 재생하는 전체 워크플로우를 설명합니다.
 
-**전체 흐름**: WebView GameObject 설정 → 다운로드 → 웹뷰 런치 → 영상 로드 → 영상 재생 (웹뷰 표시)
+**전체 흐름**: WebView GameObject 설정 → 다운로드(선택) → 웹뷰 런치 → 웹뷰 표시 및 콘텐츠 재생
+
+> **💡 참고**: 다운로드 단계는 선택사항입니다. Unity 앱 내에서 직접 콘텐츠를 다운로드해야 하는 경우에만 사용하세요.
 
 ---
 
@@ -41,31 +43,43 @@ Add Component > Muabe.WebView.FlutterWebBridge
 **필수 설정:**
 - **Port**: `8088` (사용할 서버 포트 번호)
 - **Default Document**: `index.html` (루트가 될 HTML 파일 이름)
+- **Content Path**: `arpedia/dino/wj_demo` (Default Document(index.html)가 있는 경로, persistentDataPath 기준)
 
 **Inspector 설정:**
 ```
 ┌─ Local Web Server (Script) ──────────┐
 │ Port: 8088                            │
+│ Auto Start On Start: ❌               │
 │ Default Document: index.html          │
-│ Content Source: PersistentDataPath    │
-│ Route Prefix: (비워둠)                │
+│ Log Requests: ❌                      │
+│ Content Path: arpedia/dino/wj_demo    │
+│ Android Preload List File:            │
+│ Android Preload List Comment Char: #  │
 └───────────────────────────────────────┘
 ```
 
 > **💡 참고**: Port 번호는 8088을 권장하지만, 다른 번호 사용 시 WebViewController에서도 동일하게 설정해야 합니다.
+>
+> **Content Path 설정**:
+> - persistentDataPath를 기준으로 한 상대 경로입니다
+> - 예: `arpedia/dino/wj_demo`로 설정하면 실제 경로는 `{persistentDataPath}/arpedia/dino/wj_demo`
+> - WebContentDownloadManager의 Install Folder Path와 일치하도록 설정해야 합니다
+> - 절대 경로도 지원합니다 (개발 환경에서 유용)
 
-#### 1.4.2 WebContentDownloadManager 컴포넌트
+#### 1.4.2 WebContentDownloadManager 컴포넌트 (선택사항)
 
 다운로드한 콘텐츠를 관리합니다.
 
-**필수 설정:**
-- **Install Folder Name**: `webview-content` (다운로드한 콘텐츠 저장 폴더 이름)
+> **💡 선택사항**: 이 컴포넌트는 Unity 앱 내에서 직접 ZIP 파일을 다운로드하여 설치해야 하는 경우에만 필요합니다. 다른 방식(예: 수동 파일 복사, 외부 다운로드 도구, 빌드에 포함)으로 콘텐츠를 제공하는 경우 이 컴포넌트를 추가하지 않아도 됩니다.
+
+**설정 (사용하는 경우):**
+- **Install Folder Path**: `arpedia/dino` (다운로드한 콘텐츠 저장 경로, persistentDataPath 기준)
 - **Clear Folder Before Install**: ✅ (체크)
 
 **Inspector 설정:**
 ```
 ┌─ Web Content Download Manager (Script) ─┐
-│ Install Folder Name: webview-content     │
+│ Install Folder Path: arpedia/dino        │
 │ Version File Name: .webcontent-version   │
 │ Install On Start: ❌                     │
 │ Clear Folder Before Install: ✅          │
@@ -79,6 +93,8 @@ Add Component > Muabe.WebView.FlutterWebBridge
 ```
 
 > **💡 참고**: `Clear Folder Before Install`을 체크하면 새 버전 설치 시 기존 폴더를 먼저 삭제하여 충돌을 방지합니다.
+>
+> **경로 설정**: `Install Folder Path`는 persistentDataPath를 기준으로 한 상대 경로입니다. 예를 들어 `arpedia/dino`로 설정하면 실제 경로는 `{persistentDataPath}/arpedia/dino`가 됩니다.
 
 #### 1.4.3 WebViewController 컴포넌트
 
@@ -87,19 +103,21 @@ WebView를 제어합니다.
 **필수 설정:**
 - **Server Port**: `8088` (LocalWebServer의 Port와 동일한 번호)
 - **Enable WKWebView**: ✅ (체크, iOS용)
+- **Transparent**: 웹뷰의 배경을 투명하게 처리 할 것인지 설정
+- **Ignore Safe Area**: 웹뷰가 Safe Area 영역을 무시할지 설정
 
 **Inspector 설정:**
 ```
 ┌─ Web View Controller (Script) ───────────┐
 │ ▼ Local HTTP Server                      │
-│   Server Port: 8088                       │
-│                                           │
+│   Server Port: 8088                      │
+│                                          │
 │ ▼ WebView                                │
 │   Auto Load On Start: ❌                 │
 │   Enable WKWebView: ✅                   │
 │   Transparent: ✅                        │
 │   Ignore Safe Area: ❌                   │
-│                                           │
+│                                          │
 │ ▼ Overlay Margins (px)                   │
 │   Overlay Padding Left: 0                │
 │   Overlay Padding Top: 0                 │
@@ -120,10 +138,10 @@ Unity와 Flutter 간 양방향 통신을 담당합니다.
 **Inspector 설정:**
 ```
 ┌─ Flutter Web Bridge (Script) ────────────┐
-│ Target Web View: (자동 할당됨)            │
+│ Target Web View: (자동 할당됨)              │
 │ Unity To Flutter Event: __unityBridge    │
 │ Enable Debug Logs: ✅                    │
-│                                           │
+│                                          │
 │ ▼ Events                                 │
 │   On Videos Loaded (Int32, Int32)        │
 └──────────────────────────────────────────┘
@@ -138,7 +156,8 @@ Unity와 Flutter 간 양방향 통신을 담당합니다.
 **체크리스트:**
 - [ ] LocalWebServer의 Port: `8088`
 - [ ] LocalWebServer의 Default Document: `index.html`
-- [ ] WebContentDownloadManager의 Install Folder Name: `webview-content`
+- [ ] LocalWebServer의 Content Path: `arpedia/dino/wj_demo`
+- [ ] WebContentDownloadManager의 Install Folder Path: `arpedia/dino`
 - [ ] WebContentDownloadManager의 Clear Folder Before Install: ✅
 - [ ] WebViewController의 Server Port: `8088` (LocalWebServer와 동일)
 - [ ] WebViewController의 Enable WKWebView: ✅
@@ -170,9 +189,10 @@ WebViewManager GameObject에 위 스크립트를 추가하면 씬이 변경되�
 WebViewManager
 ├─ LocalWebServer
 │  ├─ Port: 8088
-│  └─ Default Document: index.html
+│  ├─ Default Document: index.html
+│  └─ Content Path: arpedia/dino/wj_demo
 ├─ WebContentDownloadManager
-│  ├─ Install Folder Name: webview-content
+│  ├─ Install Folder Path: arpedia/dino
 │  └─ Clear Folder Before Install: ✅
 ├─ WebViewController
 │  ├─ Server Port: 8088
@@ -184,11 +204,19 @@ WebViewManager
 
 ---
 
-## 2단계: Download 버튼 설정
+## 2단계: Download 버튼 설정 (선택사항)
 
 ### 2.1 개요
 
 웹 콘텐츠(Flutter/React 앱)를 ZIP 파일로 다운로드하기 위한 UI 버튼을 설정하는 단계입니다.
+
+> **💡 선택사항**: 이 단계는 Unity 앱 내에서 직접 웹 콘텐츠를 다운로드해야 하는 경우에만 필요합니다. 다음과 같은 경우에는 이 단계를 건너뛸 수 있습니다:
+> - 콘텐츠 파일을 수동으로 기기에 복사하는 경우
+> - 콘텐츠를 Unity 빌드에 포함시키는 경우 (StreamingAssets 등)
+> - 외부 다운로드 매니저나 다른 방식으로 파일을 제공하는 경우
+> - 개발 중 로컬 파일 시스템의 절대 경로를 사용하는 경우
+>
+> 이 단계를 건너뛰는 경우, 3단계부터 시작하면 됩니다.
 
 ### 2.2 UI 버튼 생성
 
@@ -227,14 +255,14 @@ DownloadButton 선택 > Inspector > Add Component > Muabe.WebView.WebContentDown
 **Inspector 설정 예시:**
 ```
 ┌─ Web Content Download Button (Script) ───┐
-│ Installer: WebViewManager                 │
-│ Launch Button: (비워둠)                   │
-│                                           │
-│ ▼ 다운로드 입력                           │
-│   Download Url:                           │
-│   https://example.com/flutter-app.zip     │
-│                                           │
-│   Remote Version Override: 1.0.0          │
+│ Installer: WebViewManager                │
+│ Launch Button: (비워둠)                    │
+│                                          │
+│ ▼ 다운로드 입력                             │
+│   Download Url:                          │
+│   https://example.com/flutter-app.zip    │
+│                                          │
+│   Remote Version Override: 1.0.0         │
 │                                           │
 │ ▼ 라벨 설정                               │
 │   Downloading Label: 다운로드 중...       │
@@ -665,7 +693,7 @@ public class AutoDownloadAndLaunch : MonoBehaviour
 
 ### 3.1 개요
 
-2단계에서 다운로드한 콘텐츠를 로컬 HTTP 서버로 서비스하고, WebView를 초기화하여 로드하는 단계입니다.
+1단계에서 설정한 LocalWebServer를 시작하고, WebView를 초기화하여 로드하는 단계입니다. LocalWebServer의 Content Path가 이미 설정되어 있어 별도의 경로 설정 없이 바로 서버를 시작할 수 있습니다.
 
 ### 3.2 UI 버튼 생성
 
@@ -688,39 +716,20 @@ LaunchButton 선택 > Inspector > Add Component > Muabe.WebView.WebContentLaunch
 
 **필수 설정:**
 
-1. **Installer**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
-   - WebViewManager의 `WebContentDownloadManager` 컴포넌트가 자동으로 연결됩니다
-
-2. **Target Server**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
+1. **Target Server**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
    - WebViewManager의 `LocalWebServer` 컴포넌트가 자동으로 연결됩니다
 
-3. **Target Web View**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
+2. **Target Web View**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
    - WebViewManager의 `WebViewController` 컴포넌트가 자동으로 연결됩니다
-
-4. **Content Root Subfolder**: ZIP 파일 압축 시 사용한 폴더 이름 입력
-   - 예시: `flutter`
-   - ⚠️ 2단계의 ZIP 파일 구조와 일치해야 합니다
-   - 예: `flutter-app.zip` → 내부에 `flutter` 폴더 → `flutter/index.html`
-
-5. **Route Prefix**: 서버 URL 경로에 사용할 프리픽스 입력
-   - 예시: `flutter`
-   - Content Root Subfolder와 동일하게 설정하는 것을 권장
-   - 최종 URL: `http://localhost:8088/flutter/`
 
 **Inspector 설정 예시:**
 ```
 ┌─ Web Content Launch Button (Script) ─────┐
 │ ▼ 필수 참조                               │
-│   Installer: WebViewManager               │
 │   Target Server: WebViewManager           │
 │   Target Web View: WebViewManager         │
 │                                           │
-│ ▼ 경로 입력                               │
-│   Content Root Subfolder: flutter        │
-│   Route Prefix: flutter                  │
-│                                           │
 │ ▼ 로드 옵션                               │
-│   Configure Server On Load: ✅           │
 │   Start Server If Needed: ✅             │
 │   Wait For Server Ready: ✅              │
 │   Server Ready Timeout: 5                │
@@ -731,7 +740,6 @@ LaunchButton 선택 > Inspector > Add Component > Muabe.WebView.WebContentLaunch
 │   Waiting Server Label: 서버 시작 중...  │
 │   Completed Label: 로드 완료             │
 │   Failed Label: 로드 실패                │
-│   Not Ready Label: 콘텐츠 없음           │
 │                                           │
 │ ▼ 이벤트                                  │
 │   On Load Started ()                     │
@@ -740,35 +748,11 @@ LaunchButton 선택 > Inspector > Add Component > Muabe.WebView.WebContentLaunch
 └──────────────────────────────────────────┘
 ```
 
+> **💡 참고**: LocalWebServer의 Content Path가 1단계에서 이미 설정되어 있으므로 별도의 경로 설정이 필요하지 않습니다.
+
 ### 3.5 상세 설정 설명
 
-#### 3.5.1 경로 입력
-
-**Content Root Subfolder**
-- ZIP 파일 내부의 실제 웹 앱 폴더명
-- 예시 구조:
-  ```
-  flutter-app.zip
-  └── flutter/          ← 이 폴더명을 입력
-      ├── index.html
-      ├── main.dart.js
-      └── assets/
-  ```
-- 빈 값으로 설정하면 ZIP 루트를 사용
-
-**Route Prefix**
-- 서버 URL의 경로 부분
-- `flutter` 입력 시 → `http://localhost:8088/flutter/`
-- `app` 입력 시 → `http://localhost:8088/app/`
-- 빈 값으로 설정하면 → `http://localhost:8088/`
-
-> **💡 권장**: Content Root Subfolder와 Route Prefix를 동일하게 설정하면 혼란을 방지할 수 있습니다.
-
-#### 3.5.2 로드 옵션
-
-**Configure Server On Load** (기본: ✅)
-- 서버 시작 시 자동으로 콘텐츠 경로와 라우트를 설정합니다
-- 체크 해제 시: 수동으로 서버 설정 필요
+#### 3.5.1 로드 옵션
 
 **Start Server If Needed** (기본: ✅)
 - 서버가 실행 중이 아니면 자동으로 시작합니다
@@ -791,74 +775,51 @@ LaunchButton 선택 > Inspector > Add Component > Muabe.WebView.WebContentLaunch
 
 **체크리스트:**
 - [ ] LaunchButton에 `WebContentLaunchButton` 컴포넌트가 추가되었는지 확인
-- [ ] `Installer`, `Target Server`, `Target Web View` 모두 `WebViewManager`로 설정되었는지 확인
-- [ ] `Content Root Subfolder`에 ZIP 폴더명이 입력되었는지 확인 (예: `flutter`)
-- [ ] `Route Prefix`가 입력되었는지 확인 (예: `flutter`)
-- [ ] Content Root Subfolder와 Route Prefix가 동일한지 확인 (권장)
+- [ ] `Target Server`에 `WebViewManager`가 설정되었는지 확인
+- [ ] `Target Web View`에 `WebViewManager`가 설정되었는지 확인
+- [ ] 1단계에서 LocalWebServer의 Content Path가 올바르게 설정되었는지 확인
 
 ### 3.7 동작 흐름
 
 ```mermaid
 graph TD
-    A[사용자가 Launch 버튼 클릭] --> B{콘텐츠 설치 확인}
-    B -->|미설치| C[Not Ready 라벨 표시]
-    B -->|설치됨| D[서버 콘텐츠 경로 설정]
-    D --> E{서버 실행 중?}
-    E -->|아니오| F[LocalWebServer.StartServer]
-    E -->|예| G[서버 준비 대기]
+    A[사용자가 Launch 버튼 클릭] --> B{서버 실행 중?}
+    B -->|아니오| C[LocalWebServer.StartServer]
+    B -->|예| D[서버 준비 대기]
+    C --> D
+    D --> E{서버 준비 완료?}
+    E -->|타임아웃| F[경고 로그]
+    E -->|완료| G[WebViewController.LoadInitialUrl]
     F --> G
-    G --> H{서버 준비 완료?}
-    H -->|타임아웃| I[경고 로그]
-    H -->|완료| J[WebViewController.LoadInitialUrl]
-    I --> J
-    J --> K[WebView 초기화 + 숨김 상태]
-    K --> L[Completed 라벨 표시]
+    G --> H[WebView 초기화 + 숨김 상태]
+    H --> I[Completed 라벨 표시]
 ```
 
 **주요 단계:**
-1. 콘텐츠 설치 여부 확인 (`HasInstalledContent()`)
-2. 서버 경로 설정 (`SetContentRootOverride()`, `SetRoutePrefix()`)
-3. 서버 시작 (`StartServer()`)
-4. 서버 준비 대기 (최대 5초)
-5. WebView URL 로드 (`LoadInitialUrl()`)
-6. WebView 초기화 완료 (숨김 상태 유지)
+1. 서버 실행 확인
+2. 서버 시작 (`StartServer()`) - Content Path는 1단계에서 이미 설정됨
+3. 서버 준비 대기 (최대 5초)
+4. WebView URL 로드 (`LoadInitialUrl()`)
+5. WebView 초기화 완료 (숨김 상태 유지)
 
-> **⚠️ 중요**: 이 단계에서는 WebView가 **숨김 상태**로 로드됩니다. 실제로 화면에 표시되려면 4단계(영상 로드) 이후 Show 버튼을 클릭해야 합니다.
+> **⚠️ 중요**: 이 단계에서는 WebView가 **숨김 상태**로 로드됩니다. 실제로 화면에 표시되려면 4단계(웹뷰 Show)에서 Show 버튼을 클릭해야 합니다.
 
-### 3.8 서버 URL 구조
-
-설정에 따른 최종 URL:
-
-| Content Root | Route Prefix | 서버 URL | 파일 경로 |
-|--------------|--------------|---------|----------|
-| `flutter` | `flutter` | `http://localhost:8088/flutter/` | `persistentDataPath/webview-content/flutter/index.html` |
-| `app` | `app` | `http://localhost:8088/app/` | `persistentDataPath/webview-content/app/index.html` |
-| `build` | `web` | `http://localhost:8088/web/` | `persistentDataPath/webview-content/build/index.html` |
-| (빈 값) | (빈 값) | `http://localhost:8088/` | `persistentDataPath/webview-content/index.html` |
-
-### 3.9 테스트
+### 3.8 테스트
 
 1. Unity Editor에서 Play 모드 실행
-2. DownloadButton 클릭 → 다운로드 완료 대기
-3. LaunchButton 클릭
-4. Console에서 로그 확인:
+2. LaunchButton 클릭
+3. Console에서 로그 확인:
    ```
-   [WebContentLaunchButton] Loading initial WebView (hidden)
+   [WebContentLaunchButton] Starting server...
    [LocalWebServer] Server started on port 8088
-   [WebViewController] Loading URL: http://localhost:8088/flutter/
-   [WebView] Loaded: http://localhost:8088/flutter/
+   [LocalWebServer] Serving content from: {persistentDataPath}/arpedia/dino/wj_demo
+   [WebViewController] Loading URL: http://localhost:8088/
+   [WebView] Loaded: http://localhost:8088/
    ```
-5. 버튼에 "로드 완료" 표시 확인
-6. WebView는 아직 화면에 표시되지 않음 (숨김 상태)
+4. 버튼에 "로드 완료" 표시 확인
+5. WebView는 아직 화면에 표시되지 않음 (숨김 상태)
 
-### 3.10 트러블슈팅
-
-**문제: "콘텐츠 없음" 표시**
-- **원인**: 2단계 다운로드가 완료되지 않았거나 실패
-- **해결**:
-  1. 먼저 DownloadButton을 클릭하여 콘텐츠 다운로드
-  2. Console에서 다운로드 완료 로그 확인
-  3. `persistentDataPath/webview-content/` 폴더 존재 여부 확인
+### 3.9 트러블슈팅
 
 **문제: "서버 시작 타임아웃" 경고**
 - **원인**: 서버가 5초 내에 준비되지 않음
@@ -868,33 +829,33 @@ graph TD
   3. 1단계 LocalWebServer의 Port 값 확인
 
 **문제: WebView 빈 화면 (404 에러)**
-- **원인**: 경로 불일치 또는 파일 구조 오류
+- **원인**: Content Path 설정 오류 또는 파일 구조 오류
 - **해결**:
-  1. `Content Root Subfolder` = `Route Prefix` 확인
-  2. ZIP 파일 압축 해제 후 구조 확인:
+  1. 1단계 LocalWebServer의 Content Path가 올바른지 확인
+  2. 실제 파일 경로 확인:
      ```
-     webview-content/
-     └── flutter/
+     {persistentDataPath}/arpedia/dino/wj_demo/
          ├── index.html  ← 이 파일이 있어야 함
          └── ...
      ```
   3. Console에서 서버 로그 확인:
      ```
-     [LocalWebServer] File not found: /flutter/index.html
+     [LocalWebServer] File not found on disk: index.html
      ```
+  4. LocalWebServer의 Log Requests를 체크하여 상세 로그 확인
 
 **문제: 버튼 클릭해도 반응 없음**
 - **원인**: 참조가 올바르게 설정되지 않음
 - **해결**:
-  1. Inspector에서 Installer, Target Server, Target Web View가 모두 할당되었는지 확인
+  1. Inspector에서 Target Server, Target Web View가 모두 할당되었는지 확인
   2. 모두 동일한 `WebViewManager` GameObject를 가리켜야 함
   3. Console에서 에러 로그 확인
 
-### 3.11 스크립트에서 직접 호출하기
+### 3.10 스크립트에서 직접 호출하기
 
 UI 버튼 대신 다른 스크립트에서 메서드를 직접 호출할 수 있습니다.
 
-#### 3.11.1 기본 사용법
+#### 3.10.1 기본 사용법
 
 ```csharp
 using UnityEngine;
@@ -904,41 +865,32 @@ public class MyLaunchManager : MonoBehaviour
 {
     [SerializeField] private LocalWebServer server;
     [SerializeField] private WebViewController webViewController;
-    [SerializeField] private WebContentDownloadManager downloadManager;
-    
+
     void Start()
     {
         // WebViewManager에서 컴포넌트 찾기
         GameObject webViewManager = GameObject.Find("WebViewManager");
         server = webViewManager.GetComponent<LocalWebServer>();
         webViewController = webViewManager.GetComponent<WebViewController>();
-        downloadManager = webViewManager.GetComponent<WebContentDownloadManager>();
-        
+
         // 서버 시작 및 웹뷰 로드
         LaunchWebView();
     }
-    
+
     void LaunchWebView()
     {
-        string contentFolder = "flutter";
-        
-        // 1. 서버 경로 설정
-        server.SetContentRootOverride(downloadManager.ContentRootPath);
-        server.SetRoutePrefix(contentFolder);
-        
-        // 2. 서버 시작
+        // 1. 서버 시작 (Content Path는 1단계에서 이미 설정됨)
         server.StartServer();
-        
-        // 3. WebView URL 설정 및 로드
-        webViewController.SetWebRootPath($"/{contentFolder}/");
+
+        // 2. WebView 로드
         webViewController.LoadInitialUrl();
-        
+
         Debug.Log("웹뷰 로드 시작!");
     }
 }
 ```
 
-#### 3.11.2 서버 준비 대기
+#### 3.10.2 서버 준비 대기
 
 서버가 완전히 준비될 때까지 대기 후 WebView 로드:
 
@@ -951,33 +903,26 @@ public class MyLaunchManager : MonoBehaviour
 {
     [SerializeField] private LocalWebServer server;
     [SerializeField] private WebViewController webViewController;
-    [SerializeField] private WebContentDownloadManager downloadManager;
-    
+
     void Start()
     {
         StartCoroutine(LaunchWithServerWait());
     }
-    
+
     IEnumerator LaunchWithServerWait()
     {
-        string contentFolder = "flutter";
-        
-        // 1. 서버 설정
-        server.SetContentRootOverride(downloadManager.ContentRootPath);
-        server.SetRoutePrefix(contentFolder);
-        
-        // 2. 서버 시작
+        // 1. 서버 시작
         Debug.Log("서버 시작 중...");
         server.StartServer();
-        
-        // 3. 서버 준비 대기 (최대 5초)
+
+        // 2. 서버 준비 대기 (최대 5초)
         float timeout = 5f;
         while (!server.IsRunning && timeout > 0)
         {
             yield return new WaitForSeconds(0.1f);
             timeout -= 0.1f;
         }
-        
+
         if (!server.IsRunning)
         {
             Debug.LogWarning("서버 시작 타임아웃");
@@ -986,24 +931,22 @@ public class MyLaunchManager : MonoBehaviour
         {
             Debug.Log("서버 시작 완료!");
         }
-        
-        // 4. WebView 로드
-        webViewController.SetWebRootPath($"/{contentFolder}/");
+
+        // 3. WebView 로드
         webViewController.LoadInitialUrl();
-        
+
         Debug.Log("웹뷰 로드 완료!");
     }
 }
 ```
 
-#### 3.11.3 주요 메서드 정리
+#### 3.10.3 주요 메서드 정리
 
 **LocalWebServer 주요 메서드:**
 
 | 메서드 | 설명 | 예시 |
 |--------|------|------|
-| `SetContentRootOverride(string)` | 콘텐츠 루트 경로 설정 | `SetContentRootOverride("/path/to/content")` |
-| `SetRoutePrefix(string)` | URL 라우트 프리픽스 설정 | `SetRoutePrefix("flutter")` |
+| `SetContentPath(string)` | 콘텐츠 경로 설정 | `SetContentPath("arpedia/dino/wj_demo")` |
 | `StartServer()` | 서버 시작 | `StartServer()` |
 | `StopServer()` | 서버 중지 | `StopServer()` |
 | `IsRunning` (속성) | 서버 실행 상태 확인 | `if (server.IsRunning) { ... }` |
@@ -1012,7 +955,6 @@ public class MyLaunchManager : MonoBehaviour
 
 | 메서드 | 설명 | 예시 |
 |--------|------|------|
-| `SetWebRootPath(string)` | WebView URL 경로 설정 | `SetWebRootPath("/flutter/")` |
 | `LoadInitialUrl()` | 초기 URL 로드 | `LoadInitialUrl()` |
 | `LoadUrl(string)` | 특정 URL 로드 | `LoadUrl("http://localhost:8088/page")` |
 | `SetVisible(bool)` | WebView 표시/숨김 | `SetVisible(true)` |
@@ -1020,491 +962,22 @@ public class MyLaunchManager : MonoBehaviour
 
 ---
 
-## 4단계: 비디오 로드
+## 4단계: 웹뷰 Show 및 영상 재생
 
 ### 4.1 개요
 
-WebView 내부에서 비디오를 메모리에 미리 로드하여, 5단계(웹뷰 Show)에서 화면에 표시할 때 바로 동영상이 재생될 수 있도록 준비하는 단계입니다. Unity와 Flutter 간 브릿지 통신을 사용합니다.
+WebView를 화면에 표시하고 Flutter 앱의 특정 페이지로 이동하여 콘텐츠를 재생하는 단계입니다.
 
-> **💡 목적**: 사용자가 Show 버튼을 클릭했을 때 로딩 없이 즉시 비디오가 재생되도록 사전 준비
+> **💡 목적**: 사용자에게 WebView를 표시하고 지정한 페이지로 이동하여 콘텐츠 재생
 
 ### 4.2 UI 버튼 생성
-
-```
-Hierarchy > UI > Button - TextMeshPro
-이름: "VideoLoadButton"
-```
-
-### 4.3 컴포넌트 추가
-
-생성한 VideoLoadButton에 비디오 로드 기능을 추가합니다:
-
-```
-VideoLoadButton 선택 > Inspector > Add Component > Muabe.WebView.VideoLoadButton
-```
-
-### 4.4 Inspector 설정
-
-#### VideoLoadButton 컴포넌트
-
-**필수 설정:**
-
-1. **Bridge**: 1단계에서 생성한 `WebViewManager` GameObject를 드래그 앤 드롭
-   - WebViewManager의 `FlutterWebBridge` 컴포넌트가 자동으로 연결됩니다
-   - 이 브릿지를 통해 Unity → Flutter로 비디오 로드 명령 전송
-
-**Inspector 설정 예시:**
-```
-┌─ Video Load Button (Script) ─────────────┐
-│ ▼ 필수 참조                               │
-│   Bridge: WebViewManager                  │
-│                                           │
-│ ▼ 로드 옵션                               │
-│   Disable After Load: ✅                 │
-│   Load Timeout: 30                       │
-│                                           │
-│ ▼ 텍스트 설정                             │
-│   Loading Label: 비디오 로딩 중...       │
-│   Completed Label: 로드 완료             │
-│   Failed Label: 로드 실패                │
-│   Not Ready Label: 브릿지 없음           │
-│                                           │
-│ ▼ 이벤트                                  │
-│   On Load Started ()                     │
-│   On Load Completed ()                   │
-│   On Load Failed ()                      │
-└──────────────────────────────────────────┘
-```
-
-### 4.5 상세 설정 설명
-
-#### 4.5.1 로드 옵션
-
-**Disable After Load** (기본: ✅)
-- 비디오 로드 완료 후 버튼을 비활성화할지 여부
-- 체크 시: 한 번만 로드 가능 (권장)
-- 체크 해제 시: 여러 번 클릭 가능 (재로드 용도)
-
-**Load Timeout** (기본: 30초)
-- Flutter로부터 로드 완료 응답을 기다릴 최대 시간
-- 타임아웃 초과 시 "로드 실패" 표시
-- 비디오 파일이 크거나 많으면 시간 증가 필요
-
-> **💡 권장**: 비디오가 많거나 용량이 큰 경우 Load Timeout을 60초로 증가
-
-### 4.6 설정 검증
-
-**체크리스트:**
-- [ ] VideoLoadButton에 `VideoLoadButton` 컴포넌트가 추가되었는지 확인
-- [ ] `Bridge` 필드에 `WebViewManager` GameObject가 할당되었는지 확인
-- [ ] 1단계의 FlutterWebBridge에서 `Unity To Flutter Event`가 `__unityBridge`로 설정되었는지 확인
-
-### 4.7 Unity ↔ Flutter 통신 구조
-
-이 단계에서는 Unity와 Flutter 간 양방향 브릿지 통신이 핵심입니다.
-
-#### 4.7.1 통신 흐름
-
-```mermaid
-sequenceDiagram
-    participant User as 사용자
-    participant Button as VideoLoadButton
-    participant Bridge as FlutterWebBridge
-    participant WebView as WebView (Flutter)
-    
-    User->>Button: 버튼 클릭
-    Button->>Bridge: SendLoadVideosCommand()
-    Bridge->>WebView: JavaScript 실행<br/>window.__unityBridge.handleMessage<br/>({ type: 'load_videos' })
-    WebView->>WebView: 비디오 데이터 로드<br/>(메모리에 미리 로드)
-    WebView->>Bridge: window.unityCallFunction<br/>('OnVideosLoaded', '5,10')
-    Bridge->>Button: OnVideosLoaded(5, 10) 이벤트
-    Button->>User: "로드 완료" 표시
-```
-
-#### 4.7.2 메시지 형식
-
-**Unity → Flutter (명령 전송):**
-```javascript
-// Unity에서 JavaScript 실행
-window.__unityBridge.handleMessage({
-  type: 'load_videos'
-});
-```
-
-**Flutter → Unity (결과 반환):**
-```javascript
-// Flutter에서 Unity 함수 호출
-window.unityCallFunction('OnVideosLoaded', '5,10');
-// 매개변수: 'loadedCount,totalCount'
-```
-
-### 4.8 동작 흐름
-
-```mermaid
-graph TD
-    A[사용자가 비디오 로드 버튼 클릭] --> B{FlutterWebBridge 확인}
-    B -->|없음| C[Not Ready 라벨 표시]
-    B -->|있음| D[OnVideosLoaded 이벤트 구독]
-    D --> E[SendLoadVideosCommand 전송]
-    E --> F[Flutter: 비디오 메타데이터 조회]
-    F --> G[Flutter: 비디오 파일 메모리 로드]
-    G --> H{로드 완료?}
-    H -->|30초 타임아웃| I[Failed 라벨 표시]
-    H -->|완료| J[Flutter → Unity 메시지 전송]
-    J --> K[OnVideosLoaded 이벤트 발생]
-    K --> L[Completed 라벨 표시]
-    L --> M[버튼 비활성화]
-```
-
-**주요 단계:**
-1. FlutterWebBridge 존재 확인
-2. `OnVideosLoaded` 이벤트 구독
-3. `SendLoadVideosCommand()` → Flutter에 메시지 전송
-4. Flutter에서 비디오 데이터 로드 (파일 읽기, 메타데이터 파싱 등)
-5. Flutter → Unity 로드 완료 메시지 전송
-6. Unity에서 이벤트 수신 및 버튼 상태 업데이트
-
-### 4.9 Flutter 측 구현 (참고)
-
-Unity와 통신하려면 Flutter 앱에서 다음과 같이 구현해야 합니다:
-
-**Flutter (Dart) 예시:**
-```dart
-import 'dart:js' as js;
-
-class UnityBridge {
-  // Unity 메시지 수신
-  void init() {
-    // JavaScript에서 호출 가능한 함수 등록
-    js.context['__unityBridge'] = js.JsObject.jsify({
-      'handleMessage': (message) {
-        var msg = js.JsObject.jsify(message);
-        String type = msg['type'];
-        
-        if (type == 'load_videos') {
-          loadVideos();
-        }
-      }
-    });
-  }
-  
-  // 비디오 로드
-  Future<void> loadVideos() async {
-    print('Unity로부터 비디오 로드 요청 받음');
-    
-    // 1. 비디오 리스트 조회
-    List<Video> videos = await VideoService.fetchAll();
-    
-    // 2. 각 비디오 메타데이터 로드
-    for (var video in videos) {
-      await video.preload(); // 메모리에 미리 로드
-    }
-    
-    // 3. Unity에 완료 알림
-    int loadedCount = videos.length;
-    int totalCount = videos.length;
-    sendVideosLoaded(loadedCount, totalCount);
-  }
-  
-  // Unity로 완료 메시지 전송
-  void sendVideosLoaded(int loaded, int total) {
-    js.context.callMethod('unityCallFunction', [
-      'OnVideosLoaded',
-      '$loaded,$total'
-    ]);
-    print('Unity에 비디오 로드 완료 전송: $loaded/$total');
-  }
-}
-```
-
-> **⚠️ 중요**: Flutter 앱에서 위와 같이 Unity 브릿지를 구현하지 않으면 이 단계가 작동하지 않습니다.
-
-### 4.10 테스트
-
-1. Unity Editor에서 Play 모드 실행
-2. DownloadButton 클릭 → 다운로드 완료
-3. LaunchButton 클릭 → 웹뷰 로드 완료 (숨김 상태)
-4. VideoLoadButton 클릭
-5. Console에서 로그 확인:
-   ```
-   [VideoLoadButton] Button clicked!
-   [VideoLoadButton] Command sent to Flutter
-   [FlutterWebBridge] Sending message to Flutter: load_videos
-   [WebView] Unity로부터 비디오 로드 요청 받음 (Flutter 로그)
-   [WebView] Unity에 비디오 로드 완료 전송: 5/10 (Flutter 로그)
-   [VideoLoadButton] Event received: 5/10 videos loaded
-   [VideoLoadButton] Video load completed successfully!
-   ```
-6. 버튼에 "로드 완료" 표시 확인
-7. 버튼 비활성화 확인
-
-### 4.11 트러블슈팅
-
-**문제: "브릿지 없음" 표시**
-- **원인**: FlutterWebBridge 컴포넌트가 없거나 할당되지 않음
-- **해결**:
-  1. 1단계로 돌아가 WebViewManager에 FlutterWebBridge 컴포넌트가 추가되었는지 확인
-  2. VideoLoadButton Inspector에서 Bridge 필드가 할당되었는지 확인
-  3. Console에서 에러 로그 확인
-
-**문제: "로드 실패" (30초 타임아웃)**
-- **원인**: Flutter에서 응답을 받지 못함
-- **해결**:
-  1. Flutter 앱에서 `__unityBridge.handleMessage` 리스너가 구현되었는지 확인
-  2. Flutter 콘솔에서 'load_videos' 메시지 수신 로그 확인
-  3. Flutter에서 `window.unityCallFunction` 호출 여부 확인
-  4. Load Timeout 값을 60초로 증가 시도
-  5. 3단계 LaunchButton을 먼저 실행했는지 확인 (WebView 로드 필요)
-
-**문제: Flutter에서 메시지를 받지 못함**
-- **원인**: 브릿지 이름 불일치
-- **해결**:
-  1. 1단계 FlutterWebBridge의 `Unity To Flutter Event`가 `__unityBridge`인지 확인
-  2. Flutter 코드에서 `window.__unityBridge` 객체가 등록되었는지 확인:
-     ```dart
-     js.context['__unityBridge'] = js.JsObject.jsify({ ... });
-     ```
-  3. Flutter 웹 앱이 완전히 로드된 후 Unity 메시지를 받을 수 있음
-
-**문제: OnVideosLoaded 이벤트가 발생하지 않음**
-- **원인**: Flutter에서 Unity 함수 호출 실패
-- **해결**:
-  1. Flutter에서 `window.unityCallFunction` 함수가 존재하는지 확인:
-     ```javascript
-     console.log(typeof window.unityCallFunction); // "function"이어야 함
-     ```
-  2. WebViewController의 JavaScript 주입 확인 (자동으로 처리됨)
-  3. 메시지 형식 확인: `'OnVideosLoaded', '5,10'` (쉼표로 구분)
-
-### 4.12 스크립트에서 직접 호출하기
-
-UI 버튼 대신 다른 스크립트에서 메서드를 직접 호출할 수 있습니다.
-
-#### 4.12.1 기본 사용법
-
-```csharp
-using UnityEngine;
-using Muabe.WebView;
-
-public class MyVideoLoader : MonoBehaviour
-{
-    [SerializeField] private FlutterWebBridge bridge;
-    
-    void Start()
-    {
-        // WebViewManager에서 컴포넌트 찾기
-        if (bridge == null)
-        {
-            GameObject webViewManager = GameObject.Find("WebViewManager");
-            bridge = webViewManager.GetComponent<FlutterWebBridge>();
-        }
-        
-        // 비디오 로드 실행
-        LoadVideos();
-    }
-    
-    void LoadVideos()
-    {
-        // 이벤트 구독
-        bridge.OnVideosLoaded += HandleVideosLoaded;
-        
-        // 명령 전송
-        bridge.SendLoadVideosCommand();
-        
-        Debug.Log("비디오 로드 명령 전송됨");
-    }
-    
-    void HandleVideosLoaded(int loadedCount, int totalCount)
-    {
-        Debug.Log($"비디오 로드 완료: {loadedCount}/{totalCount}");
-        
-        // 이벤트 구독 해제
-        bridge.OnVideosLoaded -= HandleVideosLoaded;
-        
-        // 다음 단계로 진행 (예: Show 버튼 활성화)
-        EnableShowButton();
-    }
-    
-    void EnableShowButton()
-    {
-        // 5단계 Show 버튼 활성화 로직
-    }
-    
-    void OnDestroy()
-    {
-        if (bridge != null)
-        {
-            bridge.OnVideosLoaded -= HandleVideosLoaded;
-        }
-    }
-}
-```
-
-#### 4.12.2 타임아웃 처리
-
-```csharp
-using System.Collections;
-using UnityEngine;
-using Muabe.WebView;
-
-public class MyVideoLoader : MonoBehaviour
-{
-    [SerializeField] private FlutterWebBridge bridge;
-    [SerializeField] private float loadTimeout = 30f;
-    
-    void Start()
-    {
-        StartCoroutine(LoadVideosWithTimeout());
-    }
-    
-    IEnumerator LoadVideosWithTimeout()
-    {
-        bool loadComplete = false;
-        int loadedCount = 0;
-        int totalCount = 0;
-        
-        // 이벤트 구독
-        bridge.OnVideosLoaded += (loaded, total) =>
-        {
-            loadComplete = true;
-            loadedCount = loaded;
-            totalCount = total;
-        };
-        
-        // 명령 전송
-        bridge.SendLoadVideosCommand();
-        Debug.Log("비디오 로드 시작...");
-        
-        // 타임아웃 대기
-        float elapsed = 0f;
-        while (!loadComplete && elapsed < loadTimeout)
-        {
-            yield return new WaitForSeconds(1f);
-            elapsed += 1f;
-            Debug.Log($"대기 중... {elapsed}/{loadTimeout}초");
-        }
-        
-        // 결과 처리
-        if (loadComplete)
-        {
-            Debug.Log($"로드 성공! {loadedCount}/{totalCount} 비디오");
-            OnLoadSuccess();
-        }
-        else
-        {
-            Debug.LogError($"로드 타임아웃 ({loadTimeout}초)");
-            OnLoadFailed();
-        }
-    }
-    
-    void OnLoadSuccess()
-    {
-        Debug.Log("다음 단계로 진행...");
-    }
-    
-    void OnLoadFailed()
-    {
-        Debug.LogError("비디오 로드 실패. 재시도 필요.");
-    }
-}
-```
-
-#### 4.12.3 조건부 로드
-
-이미 로드되었는지 확인:
-
-```csharp
-using UnityEngine;
-using Muabe.WebView;
-
-public class SmartVideoLoader : MonoBehaviour
-{
-    [SerializeField] private FlutterWebBridge bridge;
-    
-    void Start()
-    {
-        CheckAndLoadVideos();
-    }
-    
-    void CheckAndLoadVideos()
-    {
-        // 이미 로드되었는지 확인
-        if (bridge.AreVideosLoaded)
-        {
-            Debug.Log($"비디오가 이미 로드되었습니다: {bridge.LoadedVideos}/{bridge.TotalVideos}");
-            OnVideosReady();
-        }
-        else
-        {
-            Debug.Log("비디오를 로드합니다...");
-            bridge.OnVideosLoaded += (loaded, total) =>
-            {
-                OnVideosReady();
-            };
-            bridge.SendLoadVideosCommand();
-        }
-    }
-    
-    void OnVideosReady()
-    {
-        Debug.Log("비디오 준비 완료! Show 버튼 활성화");
-        // 5단계로 진행...
-    }
-}
-```
-
-#### 4.12.4 주요 메서드 및 속성 정리
-
-**FlutterWebBridge 주요 메서드:**
-
-| 메서드/속성 | 설명 | 예시 |
-|------------|------|------|
-| `SendLoadVideosCommand()` | Flutter에 비디오 로드 명령 전송 | `bridge.SendLoadVideosCommand()` |
-| `OnVideosLoaded` (이벤트) | 로드 완료 시 호출되는 이벤트 | `bridge.OnVideosLoaded += Handler` |
-| `AreVideosLoaded` (속성) | 비디오 로드 완료 여부 | `if (bridge.AreVideosLoaded) { ... }` |
-| `LoadedVideos` (속성) | 로드된 비디오 개수 | `int count = bridge.LoadedVideos` |
-| `TotalVideos` (속성) | 전체 비디오 개수 | `int total = bridge.TotalVideos` |
-| `NavigateToPage(string)` | Flutter 페이지 전환 | `bridge.NavigateToPage("/page30")` |
-| `ShowWidget(string)` | Flutter 위젯 표시 | `bridge.ShowWidget("lion")` |
-| `HideWidget(string)` | Flutter 위젯 숨김 | `bridge.HideWidget("cloud")` |
-
-**OnVideosLoaded 이벤트 시그니처:**
-```csharp
-public event System.Action<int, int> OnVideosLoaded;
-// 매개변수: (loadedCount, totalCount)
-```
-
-### 4.13 다음 단계 준비
-
-비디오 로드가 완료되면 5단계(웹뷰 Show)로 진행할 수 있습니다:
-
-```csharp
-// 예시: VideoLoadButton 완료 이벤트 구독
-videoLoadButton.onLoadCompleted.AddListener(() =>
-{
-    Debug.Log("비디오 로드 완료! 이제 Show 버튼 클릭 가능");
-    showButton.interactable = true;
-});
-```
-
----
-
-## 5단계: 웹뷰 Show 및 영상 재생
-
-### 5.1 개요
-
-4단계에서 메모리에 로드한 비디오를 화면에 표시하는 단계입니다. WebView를 보이게 하고, Flutter 앱의 특정 페이지(영상 재생 페이지)로 이동하여 비디오를 즉시 재생합니다.
-
-> **💡 목적**: 사용자에게 WebView를 표시하고, 미리 로드된 비디오가 있는 페이지로 이동하여 즉시 재생
-
-### 5.2 UI 버튼 생성
 
 ```
 Hierarchy > UI > Button - TextMeshPro
 이름: "ShowButton"
 ```
 
-### 5.3 컴포넌트 추가
+### 4.3 컴포넌트 추가
 
 생성한 ShowButton에 웹뷰 표시 및 페이지 이동 기능을 추가합니다:
 
@@ -1512,7 +985,7 @@ Hierarchy > UI > Button - TextMeshPro
 ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 ```
 
-### 5.4 Inspector 설정
+### 4.4 Inspector 설정
 
 #### WebViewShowButton 컴포넌트
 
@@ -1566,9 +1039,9 @@ ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 └──────────────────────────────────────────┘
 ```
 
-### 5.5 상세 설정 설명
+### 4.5 상세 설정 설명
 
-#### 5.5.1 페이지 설정
+#### 4.5.1 페이지 설정
 
 **Page Path**
 - Flutter 앱에서 정의한 라우트 경로
@@ -1604,14 +1077,14 @@ ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 - 너무 길면: 사용자 경험 저하
 - 권장: 0.3초 ~ 0.5초
 
-#### 5.5.2 직접 로드 모드 옵션 (Use Bridge = ❌일 때만 사용)
+#### 4.5.2 직접 로드 모드 옵션 (Use Bridge = ❌일 때만 사용)
 
 **Url Path**
 - 직접 로드할 URL 경로
 - 예시: `/page30`, `/video/player?id=123`
 - `Use Bridge = ❌`일 때만 적용됨
 
-#### 5.5.3 표시 옵션
+#### 4.5.3 표시 옵션
 
 **Show Web View** (기본: ✅)
 - 버튼 클릭 시 WebView를 화면에 표시할지 여부
@@ -1622,10 +1095,10 @@ ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 - 직접 로드 모드에서 URL을 로드할지 여부
 - 브릿지 모드에서는 무시됨
 
-#### 5.5.4 Videos Loaded 체크
+#### 4.5.4 Videos Loaded 체크
 
 **Wait For Videos Loaded** (기본: ✅, 권장)
-- 4단계 비디오 로드가 완료될 때까지 버튼 비활성화
+- 비디오 로드가 완료될 때까지 버튼 비활성화
 - ✅ 체크: 비디오 로드 전까지 버튼 비활성화 (권장)
   - 사용자가 비디오가 준비되지 않은 상태에서 페이지를 여는 것을 방지
   - `OnVideosLoaded` 이벤트 발생 시 버튼 자동 활성화
@@ -1635,7 +1108,7 @@ ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 
 > **⚠️ 중요**: 영상 재생 페이지로 이동하는 경우 반드시 `Wait For Videos Loaded = ✅`로 설정
 
-### 5.6 설정 검증
+### 4.6 설정 검증
 
 **체크리스트:**
 - [ ] ShowButton에 `WebViewShowButton` 컴포넌트가 추가되었는지 확인
@@ -1645,7 +1118,7 @@ ShowButton 선택 > Inspector > Add Component > Muabe.WebView.WebViewShowButton
 - [ ] `Use Bridge`가 체크되었는지 확인 (권장)
 - [ ] `Wait For Videos Loaded`가 체크되었는지 확인 (영상 재생 시 필수)
 
-### 5.7 동작 흐름
+### 4.7 동작 흐름
 
 ```mermaid
 graph TD
@@ -1679,9 +1152,9 @@ graph TD
 7. Flutter에서 `Navigator.pushNamed(context, '/page30')` 실행
 8. 영상 재생 페이지로 이동 → 미리 로드된 비디오 즉시 재생
 
-### 5.8 Unity ↔ Flutter 통신 (페이지 전환)
+### 4.8 Unity ↔ Flutter 통신 (페이지 전환)
 
-#### 5.8.1 통신 흐름
+#### 4.8.1 통신 흐름
 
 ```mermaid
 sequenceDiagram
@@ -1701,7 +1174,7 @@ sequenceDiagram
     Flutter->>User: 영상 재생 페이지 표시
 ```
 
-#### 5.8.2 메시지 형식
+#### 4.8.2 메시지 형식
 
 **Unity → Flutter (페이지 전환):**
 ```javascript
@@ -1737,7 +1210,7 @@ class UnityBridge {
 }
 ```
 
-### 5.9 테스트
+### 4.9 테스트
 
 1. Unity Editor에서 Play 모드 실행
 2. DownloadButton 클릭 → 다운로드 완료
@@ -1760,7 +1233,7 @@ class UnityBridge {
    - Flutter 앱의 page30으로 이동
    - 미리 로드된 영상이 즉시 재생됨
 
-### 5.10 트러블슈팅
+### 4.10 트러블슈팅
 
 **문제: 버튼이 계속 비활성화됨**
 - **원인**: `Wait For Videos Loaded = ✅`인데 비디오 로드가 완료되지 않음
@@ -1806,17 +1279,17 @@ class UnityBridge {
   4. Console에서 WebView 로드 에러 확인
 
 **문제: 영상이 로딩 중으로 표시됨 (즉시 재생 안 됨)**
-- **원인**: 4단계 비디오 로드를 건너뜀
+- **원인**: 비디오 로드가 완료되지 않음
 - **해결**:
-  1. ShowButton 클릭 전에 VideoLoadButton을 먼저 클릭
-  2. `Wait For Videos Loaded = ✅`로 설정하여 자동 대기
-  3. Flutter 앱에서 비디오 프리로드 구현 확인
+  1. `Wait For Videos Loaded = ✅`로 설정하여 비디오 로드 완료 대기
+  2. Flutter 앱에서 비디오 프리로드 구현 확인
+  3. `OnVideosLoaded` 이벤트가 정상적으로 발생하는지 확인
 
-### 5.11 스크립트에서 직접 호출하기
+### 4.11 스크립트에서 직접 호출하기
 
 UI 버튼 대신 다른 스크립트에서 메서드를 직접 호출할 수 있습니다.
 
-#### 5.11.1 기본 사용법
+#### 4.11.1 기본 사용법
 
 ```csharp
 using UnityEngine;
@@ -1853,7 +1326,7 @@ public class MyShowController : MonoBehaviour
 }
 ```
 
-#### 5.11.2 비디오 로드 대기 후 표시
+#### 4.11.2 비디오 로드 대기 후 표시
 
 비디오가 완전히 로드된 후 자동으로 페이지 표시:
 
@@ -1907,7 +1380,7 @@ public class AutoShowController : MonoBehaviour
 }
 ```
 
-#### 5.11.3 조건부 표시
+#### 4.11.3 조건부 표시
 
 비디오 로드 상태 확인 후 표시:
 
@@ -1962,7 +1435,7 @@ public class SmartShowController : MonoBehaviour
 }
 ```
 
-#### 5.11.4 주요 메서드 정리
+#### 4.11.4 주요 메서드 정리
 
 **WebViewController 표시 관련:**
 
@@ -1978,7 +1451,7 @@ public class SmartShowController : MonoBehaviour
 | `NavigateToPage(string)` | Flutter 페이지 전환 | `bridge.NavigateToPage("/page30")` |
 | `AreVideosLoaded` (속성) | 비디오 로드 완료 여부 | `if (bridge.AreVideosLoaded) { ... }` |
 
-### 5.12 전체 워크플로우 요약
+### 4.12 전체 워크플로우 요약
 
 모든 단계를 순서대로 실행한 최종 결과:
 
@@ -2011,12 +1484,12 @@ graph LR
 
 **1단계: WebView GameObject 설정**
 - [ ] WebViewManager GameObject 생성
-- [ ] LocalWebServer 추가 (Port: 8088, Default Document: index.html)
-- [ ] WebContentDownloadManager 추가 (Install Folder Name: webview-content, Clear Folder: ✅)
+- [ ] LocalWebServer 추가 (Port: 8088, Default Document: index.html, Content Path: arpedia/dino/wj_demo)
+- [ ] WebContentDownloadManager 추가 (선택사항 - 앱 내 다운로드 기능 사용 시만)
 - [ ] WebViewController 추가 (Server Port: 8088, Enable WKWebView: ✅)
 - [ ] FlutterWebBridge 추가 (Unity To Flutter Event: __unityBridge)
 
-**2단계: Download 버튼 설정**
+**2단계: Download 버튼 설정 (선택사항 - 앱 내 다운로드 기능 사용 시만)**
 - [ ] DownloadButton 생성
 - [ ] WebContentDownloadButton 컴포넌트 추가
 - [ ] Installer: WebViewManager 할당
@@ -2030,14 +1503,7 @@ graph LR
 - [ ] Content Root Subfolder: ZIP 폴더명 입력 (예: flutter)
 - [ ] Route Prefix: 동일한 폴더명 입력 (예: flutter)
 
-**4단계: Video Load 버튼 설정**
-- [ ] VideoLoadButton 생성
-- [ ] VideoLoadButton 컴포넌트 추가
-- [ ] Bridge: WebViewManager 할당
-- [ ] Disable After Load: ✅
-- [ ] Load Timeout: 30초 (필요 시 증가)
-
-**5단계: Show 버튼 설정**
+**4단계: Show 버튼 설정**
 - [ ] ShowButton 생성
 - [ ] WebViewShowButton 컴포넌트 추가
 - [ ] Target Web View: WebViewManager 할당
@@ -2049,10 +1515,11 @@ graph LR
 ### 실행 순서
 
 ```
-1. DownloadButton 클릭 → 다운로드 완료 대기
+1. DownloadButton 클릭 → 다운로드 완료 대기 (선택사항 - 앱 내 다운로드 사용 시만)
 2. LaunchButton 클릭 → 서버 시작 및 WebView 로드 (숨김)
-3. VideoLoadButton 클릭 → 비디오 메모리 로드
-4. ShowButton 자동 활성화 → 클릭 → 영상 즉시 재생
+3. ShowButton 클릭 → WebView 표시 및 페이지 이동
 ```
+
+> **💡 참고**: 2단계(Download)를 건너뛴 경우, 콘텐츠 파일이 이미 올바른 경로에 있는지 확인한 후 LaunchButton부터 시작하면 됩니다.
 
 ---

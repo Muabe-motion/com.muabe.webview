@@ -2,7 +2,7 @@
 
 [![Unity Version](https://img.shields.io/badge/Unity-2019.4%2B-blue)](https://unity.com/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.8-orange)](package.json)
+[![Version](https://img.shields.io/badge/version-1.0.10-orange)](package.json)
 
 Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹뷰, 로컬 웹 서버, 원격 콘텐츠 배포를 통합 구성할 수 있도록 도와줍니다. Flutter·React 등으로 제작한 웹 앱을 Android, iOS에서 동일한 워크플로로 배포하고, Unity와 웹 앱 간 양방향 통신을 지원합니다.
 
@@ -13,9 +13,8 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 ### 핵심 기능
 - 🌐 **네이티브 WebView**: `gree/unity-webview` 기반 커스텀 WebView 구현 (Android/iOS)
 - 🖥️ **로컬 HTTP 서버**: Unity 내장 경량 서버로 웹 콘텐츠 제공
-- 📦 **원격 콘텐츠 관리**: ZIP 파일 다운로드, 버전 관리, 자동 업데이트
+- 📦 **원격 콘텐츠 관리** (선택사항): ZIP 파일 다운로드, 버전 관리, 자동 업데이트
 - 🔄 **Unity ↔ Flutter/React 브리지**: 양방향 메시지 통신 지원
-- 🎬 **비디오 프리로드**: 영상을 미리 로드하여 즉시 재생
 - 🎮 **UI 컴포넌트**: 드래그 앤 드롭으로 쉽게 구성 가능한 버튼들
 
 ### 지원 환경
@@ -31,27 +30,26 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 ```json
 {
   "dependencies": {
-    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.8"
+    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.10"
   }
 }
 ```
 
-Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.8` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
+Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.10` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
 
 로컬 패키지로 쓰고 싶다면 이 저장소를 클론한 뒤 `Packages/com.muabe.webview` 경로를 선택해 `Add package from disk...`를 실행하면 됩니다.
 
 ## 📦 패키지 구성
 
 ### Core Components (핵심 컴포넌트)
-- **`LocalWebServer`**: 로컬 HTTP 서버 (Port 8088, 퍼시스턴트 폴더 또는 StreamingAssets 호스팅)
-- **`WebContentDownloadManager`**: ZIP 파일 다운로드, 버전 관리, 자동 업데이트
+- **`LocalWebServer`**: 로컬 HTTP 서버 (Port 8088, Content Path 기반 콘텐츠 제공)
+- **`WebContentDownloadManager`** (선택사항): ZIP 파일 다운로드, 버전 관리, 자동 업데이트
 - **`WebViewController`**: 웹뷰 초기화, URL 로드, 표시/숨김 제어
 - **`FlutterWebBridge`**: Unity ↔ Flutter/React 양방향 메시지 통신
 
 ### UI Components (UI 컴포넌트)
-- **`WebContentDownloadButton`**: 원격 ZIP 다운로드 버튼 (버전 체크, 자동 업데이트)
+- **`WebContentDownloadButton`** (선택사항): 원격 ZIP 다운로드 버튼 (버전 체크, 자동 업데이트)
 - **`WebContentLaunchButton`**: 서버 시작 및 웹뷰 로드 버튼
-- **`VideoLoadButton`**: 비디오 미리 로드 버튼 (Unity → Flutter 브리지 통신)
 - **`WebViewShowButton`**: 웹뷰 표시 및 페이지 전환 버튼
 - **`FlutterWidgetButton`**: Flutter 위젯 표시/숨김 제어 버튼
 
@@ -72,8 +70,10 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 ### 전체 워크플로우
 
 ```
-다운로드 → 서버 시작 & 웹뷰 로드 → 비디오 프리로드 → 웹뷰 표시 & 영상 재생
+다운로드(선택) → 서버 시작 & 웹뷰 로드 → 웹뷰 표시 & 콘텐츠 재생
 ```
+
+> **💡 참고**: 다운로드 단계는 선택사항입니다. Unity 앱 내에서 직접 콘텐츠를 다운로드해야 하는 경우에만 사용하세요.
 
 ### 1단계: WebView GameObject 설정
 
@@ -82,13 +82,15 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 Create Empty GameObject → 이름: "WebViewManager"
 ```
 
-**필수 컴포넌트 4개 추가:**
-1. `LocalWebServer` (Port: 8088, Default Document: index.html)
-2. `WebContentDownloadManager` (Install Folder Name: webview-content)
+**필수 컴포넌트 추가:**
+1. `LocalWebServer` (Port: 8088, Default Document: index.html, Content Path: arpedia/dino/wj_demo)
+2. `WebContentDownloadManager` (선택사항 - Install Folder Path: arpedia/dino)
 3. `WebViewController` (Server Port: 8088, Enable WKWebView: ✅)
 4. `FlutterWebBridge` (Unity To Flutter Event: __unityBridge)
 
-### 2단계: Download 버튼 설정
+### 2단계: Download 버튼 설정 (선택사항)
+
+> **💡 선택사항**: Unity 앱 내에서 직접 웹 콘텐츠를 다운로드해야 하는 경우에만 필요합니다.
 
 **UI Button 생성 → `WebContentDownloadButton` 컴포넌트 추가**
 
@@ -102,20 +104,11 @@ Create Empty GameObject → 이름: "WebViewManager"
 **UI Button 생성 → `WebContentLaunchButton` 컴포넌트 추가**
 
 **Inspector 설정:**
-- `Installer`, `Target Server`, `Target Web View`: 모두 WebViewManager 할당
-- `Content Root Subfolder`: ZIP 내 폴더명 (예: `flutter`)
-- `Route Prefix`: 동일한 폴더명 (예: `flutter`)
+- `Target Server`, `Target Web View`: 모두 WebViewManager 할당
 
-### 4단계: Video Load 버튼 설정 (선택사항)
+> **💡 참고**: LocalWebServer의 Content Path가 1단계에서 이미 설정되어 있으므로 별도의 경로 설정이 필요하지 않습니다.
 
-**UI Button 생성 → `VideoLoadButton` 컴포넌트 추가**
-
-**Inspector 설정:**
-- `Bridge`: WebViewManager GameObject 할당
-
-> Flutter/React 앱에서 `window.__unityBridge.handleMessage` 리스너 구현 필요
-
-### 5단계: Show 버튼 설정
+### 4단계: Show 버튼 설정
 
 **UI Button 생성 → `WebViewShowButton` 컴포넌트 추가**
 
@@ -124,14 +117,15 @@ Create Empty GameObject → 이름: "WebViewManager"
 - `Bridge`: WebViewManager 할당
 - `Page Path`: 표시할 페이지 경로 (예: `page30`)
 - `Use Bridge`: ✅ (권장)
-- `Wait For Videos Loaded`: ✅ (4단계 사용 시)
+- `Wait For Videos Loaded`: ✅ (영상 재생 시)
 
 ### 실행 순서
 
-1. **Download 버튼 클릭** → ZIP 다운로드 및 설치 완료
+1. **Download 버튼 클릭** (선택사항) → ZIP 다운로드 및 설치 완료
 2. **Launch 버튼 클릭** → 서버 시작 및 웹뷰 로드 (숨김 상태)
-3. **Video Load 버튼 클릭** → 비디오 미리 로드 (선택사항)
-4. **Show 버튼 클릭** → 웹뷰 표시 및 페이지 전환 🎉
+3. **Show 버튼 클릭** → 웹뷰 표시 및 페이지 전환 🎉
+
+> **💡 참고**: Download 버튼(2단계)을 건너뛴 경우, 콘텐츠 파일이 이미 올바른 경로에 있는지 확인한 후 Launch 버튼부터 시작하면 됩니다.
 
 > 📖 **상세 가이드**: 각 컴포넌트의 상세 설정은 [WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)를 참고하세요.
 
@@ -160,27 +154,18 @@ Create Empty GameObject → 이름: "WebViewManager"
 ## 문제 해결
 
 ### 웹뷰가 빈 화면
-- `LocalWebServer` 로그와 `WebContentDownloadManager` 설치 로그 확인
+- `LocalWebServer` 로그 확인
 - `WebViewController`의 `Server Port`와 `LocalWebServer`의 `Port`가 일치하는지 확인 (8088)
-- `Route Prefix`와 `Content Root Subfolder`가 일치하는지 확인
+- `LocalWebServer`의 `Content Path`가 올바르게 설정되었는지 확인
+- 실제 파일 경로 확인: `{persistentDataPath}/arpedia/dino/wj_demo/index.html`
 
-### ZIP 구조 오류
-- 폴더 이름이 `contentRootSubfolder`와 일치하는지 확인
-- 예상 구조: `flutter-app.zip/flutter/index.html`
-- ZIP 파일 압축 해제 후 경로 재확인
-
-### 다운로드 실패
+### 다운로드 실패 (WebContentDownloadManager 사용 시)
 - Download Url이 정확한지 확인
 - HTTPS 사용 권장 (Android HTTP 차단 방지)
 - 네트워크 연결 상태 확인
 - 브라우저에서 URL 직접 다운로드 테스트
 
-### 비디오 로드 타임아웃
-- Flutter/React 앱에서 `window.__unityBridge.handleMessage` 리스너 구현 확인
-- `Load Timeout` 값 증가 (30초 → 60초)
-- Flutter 콘솔에서 'load_videos' 메시지 수신 로그 확인
-
-### 버전 업데이트 안 됨
+### 버전 업데이트 안 됨 (WebContentDownloadManager 사용 시)
 - `Remote Version Override` 값 변경 (예: 1.0.0 → 1.0.1)
 - `Force Download Every Time` 옵션 활성화
 - 수동으로 폴더 삭제: `Application.persistentDataPath/webview-content/`
@@ -189,7 +174,7 @@ Create Empty GameObject → 이름: "WebViewManager"
 
 ## 📚 문서
 
-- **[WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)** - 단계별 상세 설정 가이드 (1~5단계)
+- **[WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)** - 단계별 상세 설정 가이드 (1~4단계)
 - **[UNITY_2019_COMPATIBILITY.md](UNITY_2019_COMPATIBILITY.md)** - Unity 2019.4 호환성 가이드
 - **[README.md](README.md)** - 이 문서 (빠른 시작 및 개요)
 
@@ -211,21 +196,9 @@ public class MyController : MonoBehaviour
         bridge.HideWidget("lion");
         bridge.ShowWidget("cloud");
         bridge.ToggleWidgetVisibility("bird");
-        
+
         // 페이지 전환
         bridge.NavigateToPage("/page30");
-        
-        // 비디오 로드 명령
-        bridge.SendLoadVideosCommand();
-    }
-    
-    void Start()
-    {
-        // Flutter로부터 이벤트 수신
-        bridge.OnVideosLoaded += (loadedCount, totalCount) =>
-        {
-            Debug.Log($"비디오 로드 완료: {loadedCount}/{totalCount}");
-        };
     }
 }
 ```
@@ -241,26 +214,19 @@ class UnityBridge {
       'handleMessage': (message) {
         var msg = js.JsObject.jsify(message);
         String type = msg['type'];
-        
+
         if (type == 'navigate') {
           String page = msg['page'];
           Navigator.pushNamed(context, page);
-        } else if (type == 'load_videos') {
-          loadVideos();
         } else if (type == 'show_widget') {
           String widgetId = msg['widgetId'];
           showWidget(widgetId);
+        } else if (type == 'hide_widget') {
+          String widgetId = msg['widgetId'];
+          hideWidget(widgetId);
         }
       }
     });
-  }
-  
-  // Unity로 비디오 로드 완료 전송
-  void sendVideosLoaded(int loaded, int total) {
-    js.context.callMethod('unityCallFunction', [
-      'OnVideosLoaded',
-      '$loaded,$total'
-    ]);
   }
 }
 ```
