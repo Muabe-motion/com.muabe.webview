@@ -16,6 +16,14 @@ namespace Muabe.WebView
         [SerializeField]
         private FlutterWebBridge bridge;
 
+        [SerializeField]
+        private LocalWebServer targetServer;
+
+        [Header("대기 옵션")]
+        [SerializeField]
+        [Tooltip("로컬 서버가 준비될 때까지 버튼을 비활성화합니다.")]
+        private bool waitForServerReady = true;
+
         [Header("페이지 설정")]
         [SerializeField]
         [Tooltip("Flutter 페이지 경로 (예: page30, /page30)")]
@@ -62,79 +70,87 @@ namespace Muabe.WebView
         [SerializeField]
         private string failedLabel = "로드 실패";
 
+#pragma warning disable 0414
         [SerializeField]
         private string notReadyLabel = "웹뷰 없음";
+#pragma warning restore 0414
 
         [SerializeField]
         private string waitingVideosLabel = "비디오 로딩 중...";
+        
+        [SerializeField]
+        private string waitingServerLabel = "서버 준비 중...";
 
         [Header("이벤트")]
         public UnityEvent onShowStarted;
         public UnityEvent onShowCompleted;
         public UnityEvent onShowFailed;
 
+        private bool serverReady = true;
+        private bool videosReady = true;
+        private bool waitingLabelActive;
+        private Image cachedButtonImage;
+
         protected override void Awake()
         {
             base.Awake();
+            cachedButtonImage = button != null ? button.GetComponent<Image>() : null;
+            serverReady = !waitForServerReady;
+            videosReady = !(useBridge && waitForVideosLoaded);
             AutoAssignReferences();
-            SubscribeToVideosLoadedEvent();
         }
 
         protected override void OnDestroy()
         {
             base.OnDestroy();
             UnsubscribeFromVideosLoadedEvent();
+            UnsubscribeFromServerReadyEvent();
         }
 
         private void SubscribeToVideosLoadedEvent()
         {
-            WebViewUtility.Log(LogPrefix, $"SubscribeToVideosLoadedEvent called. useBridge: {useBridge}, waitForVideosLoaded: {waitForVideosLoaded}, bridge: {(bridge != null ? bridge.name : "null")}");
-            
-            if (useBridge && waitForVideosLoaded)
+            if (!Application.isPlaying)
             {
-                if (bridge == null)
-                {
-                    WebViewUtility.LogWarning(LogPrefix, "Bridge is null, trying to auto-assign...");
-                    AutoAssignReferences();
-                }
-                
-                if (bridge != null)
-                {
-                    // 이미 로드되었는지 먼저 확인
-                    if (bridge.AreVideosLoaded)
-                    {
-                        WebViewUtility.Log(LogPrefix, $"Videos already loaded! ({bridge.LoadedVideos}/{bridge.TotalVideos})");
-                        SetButtonInteractable(true);
-                        return;
-                    }
-                    
-                    // 이벤트 구독
-                    bridge.OnVideosLoaded += HandleVideosLoadedEvent;
-                    WebViewUtility.Log(LogPrefix, "Subscribed to OnVideosLoaded event");
-                    
-                    // 대기 중 상태로 설정
-                    SetButtonInteractable(false);
-                    UpdateStatusLabel(waitingVideosLabel);
-                    
-                    // Raycast 차단 방지: 비활성화된 버튼도 터치를 막지 않도록
-                    if (button != null)
-                    {
-                        var image = button.GetComponent<UnityEngine.UI.Image>();
-                        if (image != null)
-                        {
-                            image.raycastTarget = false;
-                        }
-                    }
-                }
-                else
-                {
-                    WebViewUtility.LogError(LogPrefix, "Cannot subscribe to videos loaded event: Bridge is null!");
-                }
+                return;
             }
-            else
+
+            bool shouldWait = ShouldWaitForVideos();
+            if (!shouldWait)
             {
-                WebViewUtility.Log(LogPrefix, "Videos loaded check not needed or disabled");
+                WebViewUtility.Log(LogPrefix, "Videos loaded check skipped (no loader or disabled)");
+                videosReady = true;
+                UpdateButtonInteractableState();
+                return;
             }
+
+            if (bridge == null)
+            {
+                WebViewUtility.LogWarning(LogPrefix, "Bridge is null, trying to auto-assign...");
+                AutoAssignReferences();
+            }
+
+            if (bridge == null)
+            {
+                WebViewUtility.LogError(LogPrefix, "Cannot subscribe to videos loaded event: Bridge is null!");
+                videosReady = true;
+                UpdateButtonInteractableState();
+                return;
+            }
+
+            bridge.OnVideosLoaded -= HandleVideosLoadedEvent;
+
+            if (bridge.AreVideosLoaded)
+            {
+                WebViewUtility.Log(LogPrefix, $"Videos already loaded! ({bridge.LoadedVideos}/{bridge.TotalVideos})");
+                videosReady = true;
+                UpdateButtonInteractableState();
+                return;
+            }
+
+            videosReady = false;
+            bridge.OnVideosLoaded += HandleVideosLoadedEvent;
+            WebViewUtility.Log(LogPrefix, $"Subscribed to OnVideosLoaded event (button: {name})");
+            UpdateButtonInteractableState();
         }
 
         private void UnsubscribeFromVideosLoadedEvent()
@@ -149,19 +165,166 @@ namespace Muabe.WebView
         private void HandleVideosLoadedEvent(int loadedCount, int totalCount)
         {
             WebViewUtility.Log(LogPrefix, $"HandleVideosLoadedEvent called! Loaded: {loadedCount}/{totalCount}");
-            
-            SetButtonInteractable(true);
-            
-            // Raycast 다시 활성화
-            if (button != null)
+            videosReady = true;
+            UpdateButtonInteractableState();
+            WebViewUtility.Log(LogPrefix, "Button activated by videos loaded event");
+        }
+
+        private void SubscribeToServerReadyEvent()
+        {
+            if (!Application.isPlaying || !waitForServerReady)
             {
-                var image = button.GetComponent<UnityEngine.UI.Image>();
-                if (image != null)
+                serverReady = true;
+                return;
+            }
+
+            if (targetServer == null)
+            {
+                AutoAssignReferences();
+            }
+
+            if (targetServer == null)
+            {
+                WebViewUtility.LogWarning(LogPrefix, "LocalWebServer not found. Skipping server ready wait.");
+                serverReady = true;
+                return;
+            }
+
+            targetServer.OnServerReady -= HandleServerReady;
+
+            if (targetServer.IsServerReady)
+            {
+                serverReady = true;
+                UpdateButtonInteractableState();
+                return;
+            }
+
+            serverReady = false;
+            targetServer.OnServerReady += HandleServerReady;
+            WebViewUtility.Log(LogPrefix, $"Waiting for server ready event (button: {name})");
+            UpdateButtonInteractableState();
+        }
+
+        private void HandleServerReady()
+        {
+            serverReady = true;
+            if (targetServer != null)
+            {
+                targetServer.OnServerReady -= HandleServerReady;
+            }
+            WebViewUtility.Log(LogPrefix, "Local server ready detected");
+            UpdateButtonInteractableState();
+        }
+
+        private void UnsubscribeFromServerReadyEvent()
+        {
+            if (targetServer != null)
+            {
+                targetServer.OnServerReady -= HandleServerReady;
+            }
+        }
+
+        private bool ShouldWaitForVideos()
+        {
+            if (!useBridge || !waitForVideosLoaded)
+            {
+                return false;
+            }
+
+            if (bridge == null)
+            {
+                AutoAssignReferences();
+            }
+
+            if (bridge == null)
+            {
+                WebViewUtility.LogWarning(LogPrefix, "WaitForVideosLoaded enabled but bridge is missing. Skipping wait.");
+                return false;
+            }
+
+            var loaders = WebViewUtility.FindObjectsInScene<VideoLoadButton>(true);
+            if (loaders == null || loaders.Length == 0)
+            {
+                WebViewUtility.LogWarning(LogPrefix, $"WaitForVideosLoaded is enabled but no VideoLoadButton exists for bridge '{bridge.name}'. Skipping wait.");
+                return false;
+            }
+
+            foreach (var loader in loaders)
+            {
+                if (loader == null || !loader.isActiveAndEnabled)
                 {
-                    image.raycastTarget = true;
+                    continue;
+                }
+
+                if (loader.IsUsingBridge(bridge))
+                {
+                    return true;
                 }
             }
-            
+
+            WebViewUtility.LogWarning(LogPrefix, $"WaitForVideosLoaded is enabled but no active VideoLoadButton uses bridge '{bridge.name}'. Skipping wait.");
+            return false;
+        }
+
+        private void UpdateButtonInteractableState()
+        {
+            bool waitingServer = waitForServerReady && !serverReady;
+            bool waitingVideos = useBridge && waitForVideosLoaded && !videosReady;
+            bool interactable = !(waitingServer || waitingVideos);
+
+            SetButtonInteractable(interactable);
+            UpdateRaycastState(interactable);
+
+            if (!interactable)
+            {
+                if (waitingServer)
+                {
+                    SetWaitingLabel(waitingServerLabel);
+                }
+                else if (waitingVideos)
+                {
+                    SetWaitingLabel(waitingVideosLabel);
+                }
+            }
+            else
+            {
+                RestoreWaitingLabel();
+            }
+        }
+
+        private void UpdateRaycastState(bool interactable)
+        {
+            if (cachedButtonImage == null && button != null)
+            {
+                cachedButtonImage = button.GetComponent<Image>();
+            }
+
+            if (cachedButtonImage != null)
+            {
+                cachedButtonImage.raycastTarget = interactable;
+            }
+        }
+
+        private void SetWaitingLabel(string label)
+        {
+            if (string.IsNullOrEmpty(label))
+            {
+                return;
+            }
+
+            waitingLabelActive = true;
+            UpdateStatusLabel(label);
+        }
+
+        private void RestoreWaitingLabel()
+        {
+            if (!waitingLabelActive)
+            {
+                return;
+            }
+
+            waitingLabelActive = false;
+
             if (!string.IsNullOrEmpty(originalButtonLabel))
             {
                 UpdateStatusLabel(originalButtonLabel);
@@ -170,8 +333,6 @@ namespace Muabe.WebView
             {
                 UpdateStatusLabel(originalStatusLabel);
             }
-            
-            WebViewUtility.Log(LogPrefix, "Button activated by videos loaded event");
         }
 
         private void Reset()
@@ -200,20 +361,21 @@ namespace Muabe.WebView
 
         private void OnEnable()
         {
-            if (Application.isPlaying)
+            if (!Application.isPlaying)
             {
-                // OnEnable이 Awake보다 먼저 호출될 수 있으므로 bridge 확인
-                if (bridge == null)
-                {
-                    AutoAssignReferences();
-                }
-                SubscribeToVideosLoadedEvent();
+                return;
             }
+
+            AutoAssignReferences();
+            SubscribeToServerReadyEvent();
+            SubscribeToVideosLoadedEvent();
+            UpdateButtonInteractableState();
         }
 
         private void OnDisable()
         {
             UnsubscribeFromVideosLoadedEvent();
+            UnsubscribeFromServerReadyEvent();
         }
 
         private void AutoAssignReferences()
@@ -229,6 +391,29 @@ namespace Muabe.WebView
                 if (targetWebView == null && useBridge == false)
                 {
                     targetWebView = WebViewUtility.FindObjectInScene<WebViewController>(true);
+                }
+            }
+
+            if (targetServer == null)
+            {
+                if (targetWebView != null)
+                {
+                    targetServer = targetWebView.GetComponent<LocalWebServer>();
+                }
+
+                if (targetServer == null)
+                {
+                    targetServer = GetComponentInParent<LocalWebServer>();
+                }
+
+                if (targetServer == null)
+                {
+                    targetServer = WebViewUtility.FindObjectInScene<LocalWebServer>(true);
+                }
+
+                if (targetServer != null)
+                {
+                    WebViewUtility.Log(LogPrefix, $"Server auto-assigned: {targetServer.name}");
                 }
             }
 

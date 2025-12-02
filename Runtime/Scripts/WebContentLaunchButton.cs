@@ -1,5 +1,4 @@
 using System.Collections;
-using System.IO;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -13,29 +12,12 @@ namespace Muabe.WebView
 
     [Header("필수 참조")]
     [SerializeField]
-    private WebContentDownloadManager installer;
-
-    [SerializeField]
     private LocalWebServer targetServer;
 
     [SerializeField]
     private WebViewController targetWebView;
 
-    [Header("경로 입력")]
-    [SerializeField]
-    [Tooltip("설치 시 사용할 콘텐츠 하위 폴더(비워두면 기존 설정 유지)")]
-    private string contentRootSubfolder = "flutter";
-
-    [SerializeField]
-    [Tooltip("서버 라우트 프리픽스(비워두면 기존 설정 유지)")]
-    private string routePrefix = "flutter";
-
-
     [Header("로드 옵션")]
-    [Tooltip("로드 시 서버에 콘텐츠 경로를 자동으로 적용합니다.")]
-    [SerializeField]
-    private bool configureServerOnLoad = true;
-
     [Tooltip("서버가 실행 중이 아니면 자동으로 시작합니다.")]
     [SerializeField]
     private bool startServerIfNeeded = true;
@@ -66,9 +48,6 @@ namespace Muabe.WebView
     [SerializeField]
     private string failedLabel = "로드 실패";
 
-    [SerializeField]
-    private string notReadyLabel = "콘텐츠 없음";
-
     [Header("이벤트")]
     public UnityEvent onLoadStarted;
     public UnityEvent onLoadCompleted;
@@ -81,18 +60,14 @@ namespace Muabe.WebView
         {
             base.Awake();
             AutoAssignReferences();
-            NormalizeOverrides();
-            ApplyConfigurationOverrides();
             RefreshButtonState();
-            WebViewUtility.Log(LogPrefix, $"Awake (configureServerOnLoad={configureServerOnLoad}, startServerIfNeeded={startServerIfNeeded})");
+            WebViewUtility.Log(LogPrefix, $"Awake (startServerIfNeeded={startServerIfNeeded})");
         }
 
     private void Reset()
     {
         AutoAssignReferences();
         CacheOriginalLabels();
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
     }
 
     private void OnValidate()
@@ -102,21 +77,10 @@ namespace Muabe.WebView
         {
             CacheOriginalLabels();
         }
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
     }
 
         private void AutoAssignReferences()
         {
-            if (installer == null)
-            {
-                installer = GetComponentInParent<WebContentDownloadManager>();
-                if (installer == null)
-                {
-                    installer = WebViewUtility.FindObjectInScene<WebContentDownloadManager>(true);
-                }
-            }
-
             if (targetServer == null)
             {
                 targetServer = GetComponentInParent<LocalWebServer>();
@@ -141,15 +105,6 @@ namespace Muabe.WebView
 
             if (Application.isPlaying)
             {
-                if (installer != null)
-                {
-                    WebViewUtility.Log(LogPrefix, $"Installer assigned: {installer.name}");
-                }
-                else
-                {
-                    WebViewUtility.LogWarning(LogPrefix, "Installer not found!");
-                }
-
                 if (targetServer != null)
                 {
                     WebViewUtility.Log(LogPrefix, $"Server assigned: {targetServer.name}");
@@ -168,48 +123,17 @@ namespace Muabe.WebView
                     WebViewUtility.LogError(LogPrefix, "WebView not found! Please add WebViewController to your scene or manually assign it.");
                 }
             }
-
-            NormalizeOverrides();
-            ApplyConfigurationOverrides();
         }
 
         protected override void OnButtonClicked()
         {
         if (loadRoutine != null)
         {
-            return;
-        }
-
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
-        if (!HasInstallPrepared())
-        {
-            UpdateStatusLabel(notReadyLabel);
-            onLoadFailed?.Invoke();
+            WebViewUtility.LogWarning(LogPrefix, "Load already in progress");
             return;
         }
 
         loadRoutine = StartCoroutine(LoadRoutine());
-    }
-
-    private bool HasInstallPrepared()
-    {
-        if (installer == null)
-        {
-            return false;
-        }
-
-        if (installer.HasInstalledContent())
-        {
-            return true;
-        }
-
-        if (Directory.Exists(installer.ContentRootPath))
-        {
-            return true;
-        }
-
-        return false;
     }
 
         private IEnumerator LoadRoutine()
@@ -219,14 +143,10 @@ namespace Muabe.WebView
             onLoadStarted?.Invoke();
             wasSuccessful = false;
 
-        if (configureServerOnLoad)
-        {
-            ConfigureServerContent();
-        }
-
         if (startServerIfNeeded && targetServer != null && !targetServer.IsRunning)
         {
             UpdateStatusLabel(waitingServerLabel);
+            WebViewUtility.Log(LogPrefix, "Starting server...");
             targetServer.StartServer();
         }
 
@@ -241,7 +161,12 @@ namespace Muabe.WebView
 
             if (!targetServer.IsRunning)
             {
-                Debug.LogWarning($"{LogPrefix} Server did not start within timeout");
+                WebViewUtility.LogWarning(LogPrefix, "Server did not start within timeout");
+                UpdateStatusLabel(failedLabel);
+                onLoadFailed?.Invoke();
+                SetButtonInteractable(true);
+                loadRoutine = null;
+                yield break;
             }
         }
 
@@ -262,35 +187,11 @@ namespace Muabe.WebView
         loadRoutine = null;
     }
 
-    public void ConfigureServerContent()
-    {
-        if (targetServer == null)
-        {
-            Debug.LogWarning($"{LogPrefix} targetServer is not assigned. Cannot configure server.");
-            return;
-        }
-
-        if (installer == null)
-        {
-            Debug.LogWarning($"{LogPrefix} installer is not assigned. Cannot resolve content root.");
-            return;
-        }
-
-        string contentRoot = installer.ContentRootPath;
-        if (!Directory.Exists(contentRoot))
-        {
-            Debug.LogWarning($"{LogPrefix} Content root does not exist yet: {contentRoot}");
-        }
-
-        targetServer.SetContentRootOverride(contentRoot);
-        Debug.Log($"{LogPrefix} Applied content root {contentRoot}");
-    }
-
     public void StartServer()
     {
         if (targetServer == null)
         {
-            Debug.LogWarning($"{LogPrefix} targetServer is not assigned. Cannot start server.");
+            WebViewUtility.LogWarning(LogPrefix, "targetServer is not assigned. Cannot start server.");
             return;
         }
 
@@ -301,18 +202,16 @@ namespace Muabe.WebView
     {
         if (targetServer == null)
         {
-            Debug.LogWarning($"{LogPrefix} targetServer is not assigned. Cannot stop server.");
+            WebViewUtility.LogWarning(LogPrefix, "targetServer is not assigned. Cannot stop server.");
             return;
         }
 
         targetServer.StopServer();
     }
 
-    public void ResetStatusLabel()
+    public new void ResetStatusLabel()
     {
         CacheOriginalLabels();
-        NormalizeOverrides();
-        ApplyConfigurationOverrides();
         RefreshButtonState();
     }
 
@@ -335,30 +234,5 @@ namespace Muabe.WebView
                 UpdateStatusLabel(originalStatusLabel);
             }
         }
-
-        private void NormalizeOverrides()
-        {
-            contentRootSubfolder = WebViewUtility.NormalizeSubfolder(contentRootSubfolder);
-            routePrefix = WebViewUtility.NormalizeRoute(routePrefix);
-        }
-
-    public void ApplyConfigurationOverrides()
-    {
-        NormalizeOverrides();
-        if (installer != null && !string.IsNullOrWhiteSpace(contentRootSubfolder))
-        {
-            installer.SetContentRootSubfolder(contentRootSubfolder);
-        }
-
-        if (targetServer != null && !string.IsNullOrWhiteSpace(routePrefix))
-        {
-            targetServer.SetRoutePrefix(routePrefix);
-        }
-
-        if (targetWebView != null && !string.IsNullOrWhiteSpace(routePrefix))
-        {
-            targetWebView.SetWebRootPath(WebViewUtility.BuildWebRootPath(routePrefix));
-        }
-    }
     }
 }

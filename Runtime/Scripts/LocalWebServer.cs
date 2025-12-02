@@ -15,16 +15,11 @@ namespace Muabe.WebView
     {
         private const string LogPrefix = WebViewConstants.LogPrefixServer;
 
-        public enum ContentRootSource
-        {
-            StreamingAssets,
-            PersistentDataPath,
-            CustomAbsolute
-        }
-
+#if UNITY_ANDROID && !UNITY_EDITOR
         private static readonly Dictionary<string, byte[]> AndroidStreamingCache = new Dictionary<string, byte[]>();
         private static readonly object AndroidCacheLock = new object();
         private static bool androidCacheReady;
+#endif
 
         private static LocalWebServer instance;
 
@@ -46,12 +41,8 @@ namespace Muabe.WebView
 
         [Header("콘텐츠 경로 설정")]
         [SerializeField]
-        [Tooltip("콘텐츠 파일이 위치한 기본 위치")]
-        private ContentRootSource contentSource = ContentRootSource.PersistentDataPath;
-
-        [SerializeField]
-        [Tooltip("ContentRootSource가 CustomAbsolute일 때 사용할 절대 경로")]
-        private string customAbsoluteContentRoot = string.Empty;
+        [Tooltip("index.html이 있는 폴더의 상대 경로 (persistentDataPath 기준, 예: arpedia/dino/wj_demo). 절대 경로도 지원합니다.")]
+        private string contentPath = string.Empty;
 
         [SerializeField]
         [Tooltip("Android에서 사용할 파일 리스트 텍스트(선택). 상대 경로로 지정하며, 줄마다 파일 경로를 작성합니다.")]
@@ -64,14 +55,12 @@ namespace Muabe.WebView
         private TcpListener tcpListener;
         private Thread listenerThread;
         private bool isRunning;
-        private string contentRootOverride;
         private string cachedContentRootFullPath;
-        private string routePrefix = string.Empty;
         private bool isServerReady;
-        
+
         public bool IsRunning => isRunning;
         public bool IsServerReady => isServerReady;
-        
+
         public event System.Action OnServerReady;
 
     private void Awake()
@@ -90,7 +79,7 @@ namespace Muabe.WebView
 
     private void Start()
     {
-        Debug.Log($"{LogPrefix} Start (autoStartOnStart={autoStartOnStart}, contentSource={contentSource})");
+        Debug.Log($"{LogPrefix} Start (autoStartOnStart={autoStartOnStart}, contentPath={contentPath})");
         if (!autoStartOnStart)
         {
             return;
@@ -106,66 +95,72 @@ namespace Muabe.WebView
         StartServer();
     }
 
-    public void SetContentRootOverride(string absolutePath)
+    /// <summary>
+    /// index.html이 있는 폴더의 경로를 설정합니다.
+    /// 상대 경로 입력 시 persistentDataPath 기준으로 자동 변환됩니다.
+    /// 예: "arpedia/dino/wj_demo" → "{persistentDataPath}/arpedia/dino/wj_demo"
+    /// </summary>
+    public void SetContentPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(absolutePath))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            contentRootOverride = string.Empty;
+            contentPath = string.Empty;
             cachedContentRootFullPath = string.Empty;
+            Debug.LogWarning($"{LogPrefix} Content path cleared");
             return;
         }
 
-        contentRootOverride = NormalizeFullPath(absolutePath);
-        cachedContentRootFullPath = contentRootOverride;
-        Debug.Log($"{LogPrefix} Content root override set to {cachedContentRootFullPath}");
-    }
+        contentPath = NormalizeFullPath(path);
+        contentPath = EnsureDirectoryContentPath(contentPath);
 
-    public void SetRoutePrefix(string prefix)
-    {
-        routePrefix = NormalizeRoute(prefix);
+        // 캐시 무효화
         cachedContentRootFullPath = string.Empty;
+
+        Debug.Log($"{LogPrefix} Content path set to: {contentPath}");
+
+        // 경로 유효성 검증
+        if (!Directory.Exists(contentPath))
+        {
+            Debug.LogWarning($"{LogPrefix} Warning: Directory does not exist: {contentPath}");
+        }
+        else
+        {
+            string indexPath = Path.Combine(contentPath, defaultDocument);
+            if (File.Exists(indexPath))
+            {
+                Debug.Log($"{LogPrefix} ✓ Found {defaultDocument} at {indexPath}");
+            }
+            else
+            {
+                Debug.LogWarning($"{LogPrefix} Warning: {defaultDocument} not found at {indexPath}");
+            }
+        }
     }
 
-    public string GetCurrentContentRoot()
+    /// <summary>
+    /// 현재 설정된 콘텐츠 경로를 반환합니다.
+    /// </summary>
+    public string GetContentPath()
     {
         if (!string.IsNullOrEmpty(cachedContentRootFullPath))
         {
             return cachedContentRootFullPath;
         }
 
-        string basePath = string.Empty;
-        switch (contentSource)
+        if (string.IsNullOrEmpty(contentPath))
         {
-            case ContentRootSource.StreamingAssets:
-                basePath = Application.streamingAssetsPath;
-                break;
-            case ContentRootSource.PersistentDataPath:
-                basePath = Application.persistentDataPath;
-                break;
-            case ContentRootSource.CustomAbsolute:
-                basePath = customAbsoluteContentRoot;
-                break;
-        }
-
-        if (string.IsNullOrEmpty(basePath))
-        {
+            Debug.LogWarning($"{LogPrefix} Content path is empty");
             return string.Empty;
         }
 
-        if (contentSource != ContentRootSource.CustomAbsolute)
-        {
-        string prefix = NormalizeRoute(routePrefix);
-        if (!string.IsNullOrEmpty(prefix))
-        {
-            basePath = CombineFilesystemPath(basePath, prefix);
-        }
-        }
+        cachedContentRootFullPath = NormalizeFullPath(contentPath);
+        cachedContentRootFullPath = EnsureDirectoryContentPath(cachedContentRootFullPath);
 
-        cachedContentRootFullPath = NormalizeFullPath(basePath);
         if (logRequests)
         {
-            Debug.Log($"{LogPrefix} Current content root resolved to {cachedContentRootFullPath}");
+            Debug.Log($"{LogPrefix} Content path resolved to {cachedContentRootFullPath}");
         }
+
         return cachedContentRootFullPath;
     }
 
@@ -173,16 +168,32 @@ namespace Muabe.WebView
     {
         if (isRunning)
         {
+            Debug.LogWarning($"{LogPrefix} Server is already running");
+            return;
+        }
+
+        // 서버 시작 전 경로 유효성 검증
+        string currentContentPath = GetContentPath();
+        if (string.IsNullOrEmpty(currentContentPath))
+        {
+            Debug.LogError($"{LogPrefix} Cannot start server: Content path is empty. Use SetContentPath() to set the path.");
+            return;
+        }
+
+        if (!Directory.Exists(currentContentPath))
+        {
+            Debug.LogError($"{LogPrefix} Cannot start server: Directory does not exist: {currentContentPath}");
             return;
         }
 
         listenerThread = new Thread(Listen) { IsBackground = true };
         listenerThread.Start();
         Debug.Log($"{LogPrefix} Local web server starting on http://localhost:{port}");
-        
+        Debug.Log($"{LogPrefix} Serving content from: {currentContentPath}");
+
         StartCoroutine(NotifyServerReady());
     }
-    
+
     private IEnumerator NotifyServerReady()
     {
         yield return new WaitForSeconds(0.5f);
@@ -321,22 +332,13 @@ namespace Muabe.WebView
 
     private void ProcessGetRequest(NetworkStream stream, string url)
     {
-        string route = NormalizeRoute(routePrefix);
         string normalizedPath = NormalizeRequestPath(url);
 
-        if (!TryGetRelativePath(normalizedPath, route, out string relativePath))
+        if (string.IsNullOrEmpty(normalizedPath) || normalizedPath.EndsWith("/", StringComparison.Ordinal))
         {
-            WriteResponse(stream, 404, "text/plain", "Requested path is outside the configured route.");
-            Debug.LogWarning($"{LogPrefix} Requested path outside route: {normalizedPath}");
-            return;
+            normalizedPath = AppendDefaultDocument(normalizedPath);
         }
 
-        if (string.IsNullOrEmpty(relativePath) || relativePath.EndsWith("/", StringComparison.Ordinal))
-        {
-            relativePath = AppendDefaultDocument(relativePath);
-        }
-
-        string cacheKey = BuildCacheKey(route, relativePath);
         byte[] fileBytes;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -345,16 +347,16 @@ namespace Muabe.WebView
             if (!androidCacheReady)
             {
                 WriteResponse(stream, 503, "text/plain", "Server is preparing content...");
-                Debug.LogWarning($"{LogPrefix} Cache not ready yet for {relativePath}");
+                Debug.LogWarning($"{LogPrefix} Cache not ready yet for {normalizedPath}");
                 return;
             }
 
             lock (AndroidCacheLock)
             {
-                if (!AndroidStreamingCache.TryGetValue(cacheKey, out fileBytes))
+                if (!AndroidStreamingCache.TryGetValue(normalizedPath, out fileBytes))
                 {
-                    WriteResponse(stream, 404, "text/plain", $"File not cached: {cacheKey}");
-                    Debug.LogWarning($"{LogPrefix} Cache miss: {cacheKey}");
+                    WriteResponse(stream, 404, "text/plain", $"File not cached: {normalizedPath}");
+                    Debug.LogWarning($"{LogPrefix} Cache miss: {normalizedPath}");
                     return;
                 }
             }
@@ -362,18 +364,18 @@ namespace Muabe.WebView
         else
 #endif
         {
-            if (!TryReadFileFromDisk(relativePath, out fileBytes))
+            if (!TryReadFileFromDisk(normalizedPath, out fileBytes))
             {
-                WriteResponse(stream, 404, "text/plain", $"File not found: {relativePath}");
-                Debug.LogWarning($"{LogPrefix} File not found on disk: {relativePath}");
+                WriteResponse(stream, 404, "text/plain", $"File not found: {normalizedPath}");
+                Debug.LogWarning($"{LogPrefix} File not found on disk: {normalizedPath}");
                 return;
             }
         }
 
-        string contentType = GetContentType(relativePath);
+        string contentType = GetContentType(normalizedPath);
         if (logRequests)
         {
-            Debug.Log($"{LogPrefix} Serving {relativePath} ({contentType})");
+            Debug.Log($"{LogPrefix} Serving {normalizedPath} ({contentType})");
         }
         WriteResponse(stream, 200, contentType, fileBytes);
     }
@@ -381,7 +383,7 @@ namespace Muabe.WebView
     private bool TryReadFileFromDisk(string relativePath, out byte[] data)
     {
         data = null;
-        string root = GetCurrentContentRoot();
+        string root = GetContentPath();
         if (string.IsNullOrEmpty(root))
         {
             return false;
@@ -407,13 +409,13 @@ namespace Muabe.WebView
         return true;
     }
 
+#if UNITY_ANDROID && !UNITY_EDITOR
     private IEnumerator PreloadStreamingAssets()
     {
-        string route = NormalizeRoute(routePrefix);
-        string rootPath = GetCurrentContentRoot();
+        string rootPath = GetContentPath();
         if (string.IsNullOrEmpty(rootPath))
         {
-            Debug.LogWarning("[LocalWebServer] Content root path is empty. Server will start without cached files.");
+            Debug.LogWarning("[LocalWebServer] Content path is empty. Server will start without cached files.");
             StartServer();
             yield break;
         }
@@ -485,7 +487,6 @@ namespace Muabe.WebView
             }
 
             string relative = NormalizeRelativePath(entry);
-            string requestKey = BuildCacheKey(route, relative);
             string fileUri = CombineUri(baseUri, relative);
 
             using (UnityWebRequest request = UnityWebRequest.Get(fileUri))
@@ -496,7 +497,7 @@ namespace Muabe.WebView
                 {
                     lock (AndroidCacheLock)
                     {
-                        AndroidStreamingCache[requestKey] = request.downloadHandler.data;
+                        AndroidStreamingCache[relative] = request.downloadHandler.data;
                     }
                 }
                 else
@@ -514,6 +515,7 @@ namespace Muabe.WebView
         Debug.Log($"{LogPrefix} Android preload completed. Entries: {filesToPreload.Count}, source={(listFromFile ? "file" : "inspector")}");
         StartServer();
     }
+#endif
 
     private void LoadPreloadListFromDisk(string rootPath, string listRelative, List<string> output)
     {
@@ -595,43 +597,6 @@ namespace Muabe.WebView
         return path.Replace('\\', '/');
     }
 
-    private bool TryGetRelativePath(string requestPath, string route, out string relativePath)
-    {
-        string normalizedRoute = route;
-        if (!string.IsNullOrEmpty(normalizedRoute))
-        {
-            normalizedRoute = normalizedRoute.Trim('/');
-        }
-
-        if (string.IsNullOrEmpty(normalizedRoute))
-        {
-            relativePath = requestPath;
-            return true;
-        }
-
-        if (string.IsNullOrEmpty(requestPath))
-        {
-            relativePath = string.Empty;
-            return true;
-        }
-
-        if (requestPath.Equals(normalizedRoute, StringComparison.Ordinal))
-        {
-            relativePath = string.Empty;
-            return true;
-        }
-
-        string prefixWithSlash = normalizedRoute + "/";
-        if (requestPath.StartsWith(prefixWithSlash, StringComparison.Ordinal))
-        {
-            relativePath = requestPath.Substring(prefixWithSlash.Length);
-            return true;
-        }
-
-        relativePath = string.Empty;
-        return false;
-    }
-
     private string AppendDefaultDocument(string relativePath)
     {
         string sanitized = relativePath?.Trim('/') ?? string.Empty;
@@ -641,24 +606,6 @@ namespace Muabe.WebView
         }
 
         return sanitized + "/" + defaultDocument;
-    }
-
-    private string BuildCacheKey(string route, string relativePath)
-    {
-        string normalizedRoute = string.IsNullOrEmpty(route) ? string.Empty : route.Trim('/');
-        string normalizedRelative = NormalizeRelativePath(relativePath);
-
-        if (string.IsNullOrEmpty(normalizedRoute))
-        {
-            return normalizedRelative;
-        }
-
-        if (string.IsNullOrEmpty(normalizedRelative))
-        {
-            return normalizedRoute;
-        }
-
-        return normalizedRoute + "/" + normalizedRelative;
     }
 
     private string NormalizeRelativePath(string value)
@@ -674,21 +621,12 @@ namespace Muabe.WebView
         return trimmed;
     }
 
-    private string NormalizeRoute(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value.Trim().Trim('/');
-    }
-
-
     private bool ShouldUseAndroidStreamingAssets()
     {
-        return string.IsNullOrEmpty(contentRootOverride)
-            && contentSource == ContentRootSource.StreamingAssets
+        // Android StreamingAssets는 더 이상 자동으로 사용하지 않음
+        // contentPath가 StreamingAssets를 가리키고 있고 Android 플랫폼이면 preload 사용
+        return !string.IsNullOrEmpty(contentPath)
+            && contentPath.Contains("StreamingAssets")
             && Application.platform == RuntimePlatform.Android;
     }
 
@@ -718,21 +656,23 @@ namespace Muabe.WebView
         return uri.Replace('\\', '/');
     }
 
-    private string CombineFilesystemPath(string root, string subDirectory)
-    {
-        if (string.IsNullOrEmpty(subDirectory))
-        {
-            return root;
-        }
-
-        return Path.Combine(root, subDirectory.Trim('/').Replace('/', Path.DirectorySeparatorChar));
-    }
-
     private string NormalizeFullPath(string path)
     {
         if (string.IsNullOrEmpty(path))
         {
             return string.Empty;
+        }
+
+        path = path.Trim();
+
+        // 절대 경로인지 확인 (Windows: C:\ 또는 D:\, Unix: /)
+        bool isAbsolute = Path.IsPathRooted(path);
+
+        if (!isAbsolute)
+        {
+            // 상대 경로인 경우 persistentDataPath 기준으로 변환
+            path = path.Replace('\\', '/').Trim('/');
+            path = Path.Combine(Application.persistentDataPath, path);
         }
 
         try
@@ -743,6 +683,37 @@ namespace Muabe.WebView
         {
             return path;
         }
+    }
+
+    private string EnsureDirectoryContentPath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return path;
+        }
+
+        if (Directory.Exists(path))
+        {
+            return path;
+        }
+
+        string normalized = path.Replace('\\', '/');
+        bool endsWithDefaultDocument = !string.IsNullOrEmpty(defaultDocument)
+            && normalized.EndsWith("/" + defaultDocument, StringComparison.OrdinalIgnoreCase);
+
+        bool looksLikeFile = endsWithDefaultDocument || Path.HasExtension(path);
+
+        if (looksLikeFile)
+        {
+            string parent = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                Debug.Log($"{LogPrefix} Provided path appears to reference a file. Using parent directory: {parent}");
+                return parent;
+            }
+        }
+
+        return path;
     }
 
     private void WriteResponse(NetworkStream stream, int statusCode, string contentType, string message)
@@ -789,13 +760,13 @@ namespace Muabe.WebView
 
             byte[] headerBytes = Encoding.UTF8.GetBytes(header);
             stream.Write(headerBytes, 0, headerBytes.Length);
-            
+
             if (payload.Length > 0)
             {
                 // 큰 파일은 청크로 나눠서 전송
                 const int chunkSize = 8192; // 8KB 청크
                 int offset = 0;
-                
+
                 while (offset < payload.Length)
                 {
                     int bytesToWrite = Math.Min(chunkSize, payload.Length - offset);
@@ -852,6 +823,20 @@ namespace Muabe.WebView
                 return "font/woff2";
             case ".ttf":
                 return "font/ttf";
+            case ".mp4":
+                return "video/mp4";
+            case ".webm":
+                return "video/webm";
+            case ".ogg":
+                return "video/ogg";
+            case ".ogv":
+                return "video/ogg";
+            case ".mov":
+                return "video/quicktime";
+            case ".avi":
+                return "video/x-msvideo";
+            case ".m4v":
+                return "video/x-m4v";
             default:
                 return "application/octet-stream";
         }

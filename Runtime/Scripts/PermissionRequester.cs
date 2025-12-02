@@ -8,11 +8,13 @@ namespace Muabe.WebView
 {
     public class PermissionRequester : MonoBehaviour
     {
+#if UNITY_ANDROID
     [SerializeField]
     private bool requestMicrophone = true;
 
     [SerializeField]
     private bool requestCamera = true;
+#endif
 
         private void Start()
         {

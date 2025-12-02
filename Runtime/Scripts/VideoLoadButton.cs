@@ -207,5 +207,12 @@ namespace Muabe.WebView
             SetButtonInteractable(true);
             ResetStatusLabel();
         }
+
+        public FlutterWebBridge Bridge => bridge;
+
+        public bool IsUsingBridge(FlutterWebBridge target)
+        {
+            return bridge != null && bridge == target;
+        }
     }
 }

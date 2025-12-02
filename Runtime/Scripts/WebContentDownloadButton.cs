@@ -68,20 +68,17 @@ namespace Muabe.WebView
         {
             base.Awake();
             AutoAssignReferences();
-            ApplyConfigurationOverrides();
             WebViewUtility.Log(LogPrefix, $"Awake (button={name})");
         }
 
         private void Reset()
         {
             AutoAssignReferences();
-            ApplyConfigurationOverrides();
         }
 
         private void OnValidate()
         {
             AutoAssignReferences();
-            ApplyConfigurationOverrides();
         }
 
         private void AutoAssignReferences()
@@ -104,7 +101,6 @@ namespace Muabe.WebView
     private void OnEnable()
     {
         SubscribeInstallerEvents();
-        ApplyConfigurationOverrides();
         RefreshButtonState();
     }
 
@@ -159,7 +155,6 @@ namespace Muabe.WebView
                 return;
             }
 
-            ApplyConfigurationOverrides();
             SetButtonInteractable(false);
         bool hasCache = installer.HasInstalledContent();
         bool force = forceDownloadEveryTime && hasCache;
@@ -238,7 +233,10 @@ namespace Muabe.WebView
         public void SetDownloadUrl(string url)
         {
             downloadUrl = string.IsNullOrWhiteSpace(url) ? string.Empty : url.Trim();
-            ApplyConfigurationOverrides();
+            if (installer != null)
+            {
+                installer.SetRemoteVersion(remoteVersionOverride);
+            }
         }
 
         private void RefreshButtonState()
@@ -261,19 +259,6 @@ namespace Muabe.WebView
         {
             SetButtonInteractable(false);
             UpdateStatusLabel(string.IsNullOrEmpty(alreadyDownloadedLabel) ? completedLabel : alreadyDownloadedLabel);
-        }
-
-        private void ApplyConfigurationOverrides()
-        {
-            if (installer != null)
-            {
-                installer.SetRemoteVersion(remoteVersionOverride);
-            }
-
-            if (launchButton != null)
-            {
-                launchButton.ApplyConfigurationOverrides();
-            }
         }
     }
 }

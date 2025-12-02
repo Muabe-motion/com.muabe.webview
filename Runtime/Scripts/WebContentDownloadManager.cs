@@ -18,12 +18,8 @@ namespace Muabe.WebView
         private string defaultDownloadUrl = string.Empty;
 
         [SerializeField]
-        [Tooltip("다운로드한 콘텐츠를 저장할 하위 폴더 이름 (persistentDataPath 기준)")]
-        private string installFolderName = "webview-content";
-
-        [SerializeField]
-        [HideInInspector]
-        private string contentRootSubfolder = "root";
+        [Tooltip("다운로드한 콘텐츠를 저장할 상대 경로 (persistentDataPath 기준, 예: arpedia/dino/wj_demo)")]
+        private string installFolderPath = "webview-content";
 
         [SerializeField]
         [HideInInspector]
@@ -53,32 +49,21 @@ namespace Muabe.WebView
         private string activeDownloadUrl;
         private string lastDownloadUrl;
 
-        public string InstallPath => Path.Combine(Application.persistentDataPath, installFolderName);
-        public string ContentRootPath
-        {
-            get
-            {
-                string path = InstallPath;
-                if (!string.IsNullOrEmpty(contentRootSubfolder))
-                {
-                    path = Path.Combine(path, NormalizeSubfolder(contentRootSubfolder));
-                }
-                return path;
-            }
-        }
+        public string InstallPath => Path.Combine(Application.persistentDataPath, NormalizePath(installFolderPath));
+        public string ContentRootPath => InstallPath;
 
         public string LastInstallPath { get; private set; }
 
         private void Awake()
         {
-            contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+            installFolderPath = NormalizePath(installFolderPath);
             remoteVersion = NormalizeVersion(remoteVersion);
             Debug.Log($"{LogPrefix} Awake (installOnStart={installOnStart})");
         }
 
         private void Start()
         {
-            contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+            installFolderPath = NormalizePath(installFolderPath);
             remoteVersion = NormalizeVersion(remoteVersion);
             Debug.Log($"{LogPrefix} Start (installOnStart={installOnStart})");
             if (installOnStart)
@@ -89,7 +74,7 @@ namespace Muabe.WebView
 
         private void OnValidate()
         {
-            contentRootSubfolder = NormalizeSubfolder(contentRootSubfolder);
+            installFolderPath = NormalizePath(installFolderPath);
             remoteVersion = NormalizeVersion(remoteVersion);
         }
 
@@ -203,9 +188,9 @@ namespace Muabe.WebView
             remoteVersion = NormalizeVersion(version);
         }
 
-        public void SetContentRootSubfolder(string subfolder)
+        public void SetInstallFolderPath(string relativePath)
         {
-            contentRootSubfolder = NormalizeSubfolder(subfolder);
+            installFolderPath = NormalizePath(relativePath);
         }
 
         private IEnumerator EnsureContentRoutine()
@@ -319,9 +304,28 @@ namespace Muabe.WebView
             return WebViewUtility.NormalizeVersion(value);
         }
 
-        private string NormalizeSubfolder(string value)
+        private string NormalizePath(string value)
         {
-            return WebViewUtility.NormalizeSubfolder(value);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "webview-content";
+            }
+
+            value = value.Trim();
+
+            // 백슬래시를 슬래시로 변환 (Windows 경로 대응)
+            value = value.Replace('\\', '/');
+
+            // 앞뒤 슬래시 제거
+            value = value.Trim('/');
+
+            // 연속된 슬래시 제거
+            while (value.Contains("//"))
+            {
+                value = value.Replace("//", "/");
+            }
+
+            return string.IsNullOrEmpty(value) ? "webview-content" : value;
         }
 
         private void InstallFromZip(byte[] zipData, string installPath)

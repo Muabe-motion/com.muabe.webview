@@ -1,0 +1,14 @@
+{
+  "folders": [
+	{
+		"path": "../../../../../unity_sample/webview_low_version_test"
+	},
+	{
+		"path": "../../.."
+	},
+	{
+		"path": "../../../../unity_wj_sample"
+	}
+],
+  "settings": {}
+}

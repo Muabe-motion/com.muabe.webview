@@ -937,7 +937,7 @@ public class WebViewObject : MonoBehaviour
 #if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
         if (bg != null)
         {
-            bg.gameObject.active = v;
+            bg.gameObject.SetActive(v);
         }
 #endif
         if (GetVisibility() && !v)
