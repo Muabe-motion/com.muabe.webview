@@ -26,6 +26,10 @@ namespace Muabe.WebView
 
     // 비디오 로드 완료 이벤트
     public event Action<int, int> OnVideosLoaded;
+    
+    // WebView 숨김/표시 이벤트
+    public event Action OnWebViewHidden;
+    public event Action OnWebViewShown;
 
     public bool AreVideosLoaded => videosLoaded;
     public int TotalVideos => totalVideos;
@@ -88,6 +92,7 @@ namespace Muabe.WebView
 
         Debug.Log($"{LogPrefix} Hiding WebView");
         webViewController.SetVisible(false);
+        OnWebViewHidden?.Invoke();
     }
 
     public void ShowWebView()
@@ -100,6 +105,7 @@ namespace Muabe.WebView
 
         Debug.Log($"{LogPrefix} Showing WebView");
         webViewController.SetVisible(true);
+        OnWebViewShown?.Invoke();
     }
 
     public void ToggleWidgetVisibility(string widgetId)
