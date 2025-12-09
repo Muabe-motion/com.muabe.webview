@@ -11,9 +11,9 @@ namespace Muabe.WebView
         [Tooltip("로컬 서버 포트")]
         public int serverPort = WebViewConstants.DefaultServerPort;
 
-    [Tooltip("플러터 웹이 서비스되는 경로(예: /flutter/)"), HideInInspector]
+    [Tooltip("웹 루트 경로 (예: /)")]
     [SerializeField]
-    private string webRootPath = "/flutter/";
+    private string webRootPath = "/";
 
     [Header("WebView")]
     [Tooltip("초기 URL 자동 로드 여부")]
