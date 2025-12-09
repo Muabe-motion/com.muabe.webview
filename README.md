@@ -2,7 +2,7 @@
 
 [![Unity Version](https://img.shields.io/badge/Unity-2019.4%2B-blue)](https://unity.com/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.10-orange)](package.json)
+[![Version](https://img.shields.io/badge/version-1.0.11-orange)](package.json)
 
 Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹뷰, 로컬 웹 서버, 원격 콘텐츠 배포를 통합 구성할 수 있도록 도와줍니다. Flutter·React 등으로 제작한 웹 앱을 Android, iOS에서 동일한 워크플로로 배포하고, Unity와 웹 앱 간 양방향 통신을 지원합니다.
 
@@ -30,12 +30,12 @@ Muabe Interactive WebView 패키지는 Unity 프로젝트에서 네이티브 웹
 ```json
 {
   "dependencies": {
-    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.10"
+    "com.muabe.webview": "https://github.com/Muabe-motion/com.muabe.webview.git#Release-1.0.11"
   }
 }
 ```
 
-Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.10` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
+Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package from git URL...**을 선택해 동일한 주소를 입력하면 됩니다. 현재 저장소에는 `Release-1.0.11` 태그가 배포 버전으로 등록되어 있으므로 정확한 태그 이름을 사용하세요. 특정 브랜치나 커밋을 사용하고 싶다면 `#branch-name`, `#commit-hash`를 뒤에 붙여 주세요.
 
 로컬 패키지로 쓰고 싶다면 이 저장소를 클론한 뒤 `Packages/com.muabe.webview` 경로를 선택해 `Add package from disk...`를 실행하면 됩니다.
 
@@ -66,6 +66,69 @@ Unity 에디터에서는 `Window > Package Manager`를 열고 **+ > Add package 
 > 💡 **자동 참조**: 대부분의 컴포넌트 필드는 동일 GameObject 내에서 자동으로 참조됩니다.
 
 ## 🚀 빠른 시작
+
+### 두 가지 사용 방법
+
+이 패키지는 **두 가지 방식**으로 사용할 수 있습니다:
+
+1. **🎯 간편 방식 (SimpleWebViewManager)** - 코드 몇 줄로 빠르게 시작 (권장)
+2. **⚙️ 기존 방식 (수동 설정)** - Inspector에서 세밀하게 설정
+
+---
+
+## 🎯 방법 1: SimpleWebViewManager 사용 (권장)
+
+**코드 3줄로 WebView 시작!**
+
+### 1단계: GameObject 생성 및 컴포넌트 추가
+
+```
+Hierarchy > Create Empty GameObject → 이름: "WebViewManager"
+Add Component > SimpleWebViewManager
+```
+
+### 2단계: Inspector 최소 설정
+
+```
+Content Path: arpedia/dino/wj_demo
+Server Port: 8088
+```
+
+### 3단계: 코드로 실행
+
+```csharp
+using System.Collections;
+using UnityEngine;
+using Muabe.WebView;
+
+public class MyController : MonoBehaviour
+{
+    [SerializeField] private SimpleWebViewManager webViewManager;
+
+    private void Start()
+    {
+        StartCoroutine(StartWebView());
+    }
+
+    private IEnumerator StartWebView()
+    {
+        // 1. 서버 시작 및 WebView 로드 (숨김 상태)
+        webViewManager.StartServerAndLoadWebView();
+        yield return new WaitUntil(() => webViewManager.IsWebViewLoaded);
+
+        // 2. WebView 표시 및 페이지 이동
+        webViewManager.ShowWebViewAndNavigate("page30");
+    }
+}
+```
+
+**끝!** 🎉
+
+> 📖 **상세 가이드**: [SIMPLE_WEBVIEW_GUIDE.md](SIMPLE_WEBVIEW_GUIDE.md)에서 모든 기능 확인
+
+---
+
+## ⚙️ 방법 2: 기존 방식 (수동 설정)
 
 ### 전체 워크플로우
 
@@ -174,7 +237,8 @@ Create Empty GameObject → 이름: "WebViewManager"
 
 ## 📚 문서
 
-- **[WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)** - 단계별 상세 설정 가이드 (1~4단계)
+- **[SIMPLE_WEBVIEW_GUIDE.md](SIMPLE_WEBVIEW_GUIDE.md)** - 🎯 간편 사용 가이드 (SimpleWebViewManager) ⭐ 권장
+- **[WEBVIEW_SETUP_GUIDE.md](WEBVIEW_SETUP_GUIDE.md)** - ⚙️ 기존 방식 상세 설정 가이드 (1~4단계)
 - **[UNITY_2019_COMPATIBILITY.md](UNITY_2019_COMPATIBILITY.md)** - Unity 2019.4 호환성 가이드
 - **[README.md](README.md)** - 이 문서 (빠른 시작 및 개요)
 
